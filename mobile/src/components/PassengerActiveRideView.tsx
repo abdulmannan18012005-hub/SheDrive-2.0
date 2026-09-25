@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Share, ActivityIndicator, Alert } from 'react-native';
 import { SoundService } from '../services/audio/SoundService';
 
 interface PassengerActiveRideViewProps {
+  rideId?: string;
+  authToken?: string;
   status: string;
   driverName: string;
   driverPhone: string | null;
@@ -12,6 +14,8 @@ interface PassengerActiveRideViewProps {
 }
 
 export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = ({
+  rideId,
+  authToken,
   status,
   driverName,
   driverPhone,
@@ -19,10 +23,50 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
   vehicleMake,
   vehiclePlate
 }) => {
-  
+  const [isSharing, setIsSharing] = useState(false);
+
   const handleCall = () => {
     if (driverPhone) {
       Linking.openURL(`tel:${driverPhone}`);
+    }
+  };
+
+  const handleShareTrip = async () => {
+    if (!rideId || !authToken) {
+      Alert.alert('Error', 'Missing ride session data to share.');
+      return;
+    }
+
+    try {
+      setIsSharing(true);
+      // In production this comes from environment config
+      const BACKEND_URL = 'http://localhost:3016';
+      
+      const res = await fetch(`${BACKEND_URL}/api/v1/rides/${rideId}/share`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to generate share link');
+      }
+
+      const data = await res.json();
+      const message = `Track my SheDrive ride live: ${data.share_url}\nDriver: ${driverName} (${vehiclePlate})`;
+      
+      await Share.share({
+        message,
+        url: data.share_url,
+        title: 'Live Ride Tracking'
+      });
+    } catch (err) {
+      console.warn('Share error:', err);
+      Alert.alert('Error', 'Could not generate share link right now.');
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -61,8 +105,12 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
         </View>
 
         <View style={styles.safetyBar}>
-          <TouchableOpacity style={styles.shareBtn}>
-            <Text style={styles.shareBtnText}>Share Trip</Text>
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShareTrip} disabled={isSharing}>
+            {isSharing ? (
+              <ActivityIndicator color="#334155" />
+            ) : (
+              <Text style={styles.shareBtnText}>Share Trip</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.sosBtn}>
             <Text style={styles.sosBtnText}>Emergency SOS</Text>

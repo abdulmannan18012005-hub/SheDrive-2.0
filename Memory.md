@@ -18,5 +18,6 @@
   - Phase 14 (Mutual Profile Inspection - Pre-Ride)
   - Phase 15 (Active Ride State Machine & Audio Cues)
   - Phase 16 (Live Ride Share - Backend Tokenization)
-- **Active Phase**: Ready for Phase 17 (Live Ride Share - Frontend Web Map View)
-- **Active File**: N/A (Awaiting Phase 17 trigger)
+  - Phase 17 (Live Ride Share - Web Map View)
+- **Active Phase**: Ready for Phase 18 (In-Ride Safety & SOS Dispatch)
+- **Active File**: N/A (Awaiting Phase 18 trigger)

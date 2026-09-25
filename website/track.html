@@ -170,8 +170,8 @@
       </div>
 
       <div id="errorState" style="display: none; text-align: center; padding: 60px 20px; background: #FFF; border-radius: 16px;">
-        <h3 style="font-size: 1.3rem; color: #E11D48; margin-bottom: 10px;">Trip Link Expired or Not Found</h3>
-        <p style="color: #64748B; margin-bottom: 20px;">This shared trip link may have expired or is invalid.</p>
+        <h3 style="font-size: 1.3rem; color: #E11D48; margin-bottom: 10px;">Tracking Unavailable</h3>
+        <p style="color: #64748B; margin-bottom: 20px;" id="errorMessage">This tracking link has expired or was revoked by the passenger.</p>
         <a href="index.html" class="btn btn-primary">Return to Homepage</a>
       </div>
 
@@ -285,128 +285,6 @@
   <!-- Leaflet JS CDN -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="assets/js/main.js" defer></script>
-  <script>
-    // Live Web Ride Tracking Logic
-    (function() {
-      const BACKEND_URL = window.getWebsiteBackendBaseUrl ? window.getWebsiteBackendBaseUrl() : 'https://shedrive.onrender.com';
-      let map = null;
-      let pickupMarker = null;
-      let dropoffMarker = null;
-      let driverMarker = null;
-      let routePolyline = null;
-
-      // Extract share token from URL path or search query parameter (?token=...)
-      function getShareToken() {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('token')) return urlParams.get('token');
-        const pathSegments = window.location.pathname.split('/');
-        const trackIndex = pathSegments.indexOf('track');
-        if (trackIndex !== -1 && pathSegments[trackIndex + 1]) {
-          return pathSegments[trackIndex + 1];
-        }
-        return null;
-      }
-
-      const token = getShareToken();
-      if (!token) {
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('errorState').style.display = 'block';
-        return;
-      }
-
-      function initMap(lat, lng) {
-        if (map) return;
-        map = L.map('trackMap', { zoomControl: true, attributionControl: false }).setView([lat, lng], 14);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.webp', {
-          maxZoom: 19
-        }).addTo(map);
-      }
-
-      async function fetchTripData() {
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/v1/rides/track/${token}`);
-          if (!res.ok) {
-            document.getElementById('loadingState').style.display = 'none';
-            document.getElementById('errorState').style.display = 'block';
-            return;
-          }
-
-          const data = await res.json();
-          document.getElementById('loadingState').style.display = 'none';
-          document.getElementById('trackingCard').style.display = 'block';
-
-          // Update text elements
-          document.getElementById('pickupLabel').innerText = data.pickup.label || 'Pickup Point';
-          document.getElementById('dropoffLabel').innerText = data.dropoff.label || 'Destination';
-          document.getElementById('currentFareText').innerText = data.currentFare ? `Rs. ${data.currentFare}` : 'Rs. --';
-          if (data.driverName) document.getElementById('driverName').innerText = data.driverName;
-          if (data.driverVehicle) document.getElementById('driverVehicle').innerText = data.driverVehicle;
-
-          // Status label
-          const statusMap = {
-            'requested': '🔍 Searching for Drivers...',
-            'accepted': '🚗 Driver Navigating to Pickup',
-            'arrived': '📍 Driver Arrived at Pickup',
-            'in_progress': '🏎️ Trip in Progress to Destination',
-            'completed': '✅ Trip Completed Safely',
-            'cancelled': '❌ Trip Cancelled'
-          };
-          document.getElementById('rideStatusText').innerText = statusMap[data.status] || 'Live Ride in Progress';
-
-          // Initialize map with pickup coordinates
-          initMap(data.pickup.latitude, data.pickup.longitude);
-
-          // Render pickup marker
-          if (!pickupMarker) {
-            pickupMarker = L.marker([data.pickup.latitude, data.pickup.longitude], {
-              icon: L.divIcon({ html: '<span style="font-size:24px;">🟢</span>', className: '', iconSize: [28, 28], iconAnchor: [14, 14] })
-            }).addTo(map).bindPopup('Pickup Point');
-          }
-
-          // Render dropoff marker
-          if (!dropoffMarker) {
-            dropoffMarker = L.marker([data.dropoff.latitude, data.dropoff.longitude], {
-              icon: L.divIcon({ html: '<span style="font-size:24px;">🔴</span>', className: '', iconSize: [28, 28], iconAnchor: [14, 14] })
-            }).addTo(map).bindPopup('Destination');
-          }
-
-          // Render moving driver marker if available
-          let driverCoords = data.driverCoords;
-          if (typeof driverCoords === 'string') {
-            try { driverCoords = JSON.parse(driverCoords); } catch (e) {}
-          }
-
-          if (driverCoords && driverCoords.latitude && driverCoords.longitude) {
-            if (!driverMarker) {
-              driverMarker = L.marker([driverCoords.latitude, driverCoords.longitude], {
-                icon: L.divIcon({ html: '<span style="font-size:26px;">🚗</span>', className: '', iconSize: [30, 30], iconAnchor: [15, 15] })
-              }).addTo(map).bindPopup('Driver Location');
-            } else {
-              driverMarker.setLatLng([driverCoords.latitude, driverCoords.longitude]);
-            }
-          }
-
-          // Render route polyline
-          if (data.polyline && !routePolyline) {
-            try {
-              const coords = JSON.parse(data.polyline);
-              const path = coords.map(c => [c[1], c[0]]);
-              routePolyline = L.polyline(path, { color: '#0D9488', weight: 5, opacity: 0.85 }).addTo(map);
-              map.fitBounds(routePolyline.getBounds(), { padding: [30, 30] });
-            } catch (err) {
-              console.warn('Polyline parse warning:', err);
-            }
-          }
-
-        } catch (e) {
-          console.error('Tracking poll error:', e);
-        }
-      }
-
-      fetchTripData();
-      // Poll every 5 seconds for live GPS driver movement
-      setInterval(fetchTripData, 5000);
-    })();
-  </script>
+  <script src="track.js" defer></script>
 </body>
 </html>

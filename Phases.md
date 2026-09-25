@@ -94,3 +94,9 @@
 - **What was built**: A secure cryptographic tokenization engine (`POST /share`) allowing passengers to spawn 4-hour active tracking links. Engineered the public unauthenticated proxy (`GET /public-track/:shareToken`) bridging driver telemetry against valid tokens, fortified with in-memory IP rate-limiting.
 - **How it was implemented**: Mapped new `ride_shares` PostgreSQL architecture storing Hex URL-safe strings mapped conditionally to passenger UUID ownerships. Queried telemetry via cross-join filtering guaranteeing absolute zero-leak data exposure (dropping all phones, emails, and exact driver IDs).
 - **Verification**: `test-phase16.js` aggressively fuzzed generated URL hashes, audited JSON payloads confirming absolute absence of sensitive object keys natively, successfully hit 404 targets via revocation logic, and deliberately exhausted API limits confirming 429 bounce barriers. Typechecked cleanly.
+
+## Phase 17: Live Ride Share - Web Map View
+- **Completed**: Yes
+- **What was built**: A responsive public web tracking client (`track.html` & `track.js`) consuming Phase 16 payloads with smooth marker interpolation. Paired with a native `Share.share` integration on the mobile Passenger Active Ride HUD triggering link generation.
+- **How it was implemented**: Utilized `requestAnimationFrame` driving linear coordinate interpolation (lerp) over 12-second polling intervals. Rendered dynamically via Leaflet.js with privacy-masked Stitch UI components. Mapped React Native OS sharing directly out of the HUD.
+- **Verification**: `test-phase17.js` executed a headless DOM parse simulating token extraction, payload mapping, and graceful error bounds against mocked tracking coordinates. Typechecked flawlessly.
