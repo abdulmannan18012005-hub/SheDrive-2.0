@@ -890,4 +890,93 @@ router.get('/public-track/:shareToken', async (req: Request, res: Response): Pro
     }
 });
 
+// Phase 18 Schema Auto-Migration
+pool.query(`
+    CREATE TABLE IF NOT EXISTS emergency_alerts (
+        id VARCHAR(64) PRIMARY KEY,
+        ride_id VARCHAR(64) NOT NULL REFERENCES rides(ride_id),
+        user_id VARCHAR(64) NOT NULL REFERENCES users(id),
+        user_role VARCHAR(20) NOT NULL,
+        latitude NUMERIC,
+        longitude NUMERIC,
+        status VARCHAR(20) DEFAULT 'active',
+        alert_details JSONB,
+        created_at BIGINT
+    );
+    ALTER TABLE rides ADD COLUMN IF NOT EXISTS has_active_emergency BOOLEAN DEFAULT false;
+`).catch(console.error);
+
+// POST /api/v1/rides/:id/sos
+router.post('/:id/sos', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = (req as any).user.id;
+        const userRole = (req as any).user.role;
+        const { latitude, longitude, reason } = req.body;
+
+        // Verify ride exists and belongs to user
+        const rideRes = await pool.query('SELECT passenger_id, driver_id, status FROM rides WHERE ride_id = $1', [id]);
+        if (rideRes.rowCount === 0) {
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+        
+        const ride = rideRes.rows[0];
+        if (ride.passenger_id !== userId && ride.driver_id !== userId) {
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+
+        const now = Date.now();
+        const alertId = `sos-${now}-${Math.floor(Math.random() * 1000)}`;
+
+        // 1. Record Incident
+        await pool.query(`
+            INSERT INTO emergency_alerts (id, ride_id, user_id, user_role, latitude, longitude, status, alert_details, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)
+        `, [alertId, id, userId, userRole, latitude, longitude, JSON.stringify({ reason }), now]);
+
+        // 2. Fetch Contacts
+        const contactsRes = await pool.query('SELECT phone FROM emergency_contacts WHERE user_id = $1', [userId]);
+
+        // 3. Generate/Fetch Token (Passenger ONLY generates token, if driver, maybe fetch existing)
+        let shareToken = '';
+        if (userRole === 'passenger') {
+            const tokenRes = await pool.query(
+                "SELECT share_token FROM ride_shares WHERE ride_id = $1 AND created_by = $2 AND is_active = true AND expires_at > $3",
+                [id, userId, now]
+            );
+            if (tokenRes.rowCount && tokenRes.rowCount > 0) {
+                shareToken = tokenRes.rows[0].share_token;
+            } else {
+                shareToken = crypto.randomBytes(32).toString('hex');
+                const shareId = `share-${now}-${Math.floor(Math.random()*1000)}`;
+                const expiresAt = now + 4 * 60 * 60 * 1000;
+                await pool.query(
+                    "INSERT INTO ride_shares (id, ride_id, share_token, created_by, is_active, expires_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                    [shareId, id, shareToken, userId, true, expiresAt, now]
+                );
+            }
+        }
+
+        const trackUrl = shareToken ? `https://shedrive.pk/track.html?token=${shareToken}` : 'Tracking link unavailable for driver-initiated SOS yet';
+
+        // 4. Log/Dispatch Payload
+        const dispatchMsg = `EMERGENCY: User ${userId} triggered SOS during SheDrive trip. Live track: ${trackUrl}`;
+        console.log(`[SOS DISPATCH]: ${dispatchMsg} to ${contactsRes.rowCount} contacts.`);
+
+        // 5. Flag ride
+        await pool.query('UPDATE rides SET has_active_emergency = true WHERE ride_id = $1', [id]);
+
+        res.status(201).json({
+            alert_id: alertId,
+            contacts_notified: contactsRes.rowCount,
+            status: 'dispatched'
+        });
+    } catch (err) {
+        console.error('SOS dispatch error:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 export default router;

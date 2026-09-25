@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { SoundService } from '../services/audio/SoundService';
+import { EmergencySosModal } from './EmergencySosModal';
 
 interface DriverActiveRideViewProps {
+  rideId?: string;
+  authToken?: string;
   status: string;
   passengerName: string;
   passengerPhone: string | null;
@@ -10,11 +13,14 @@ interface DriverActiveRideViewProps {
 }
 
 export const DriverActiveRideView: React.FC<DriverActiveRideViewProps> = ({
+  rideId,
+  authToken,
   status,
   passengerName,
   passengerPhone,
   onUpdateStatus
 }) => {
+  const [sosVisible, setSosVisible] = useState(false);
 
   const handleCall = () => {
     if (passengerPhone) {
@@ -60,8 +66,8 @@ export const DriverActiveRideView: React.FC<DriverActiveRideViewProps> = ({
                 <Text style={styles.iconText}>📞</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.iconBtn}>
-              <Text style={styles.iconText}>🧭</Text>
+            <TouchableOpacity style={styles.iconBtnSOS} onPress={() => setSosVisible(true)}>
+              <Text style={styles.iconTextSOS}>SOS</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -74,6 +80,13 @@ export const DriverActiveRideView: React.FC<DriverActiveRideViewProps> = ({
           <Text style={styles.actionBtnText}>{actionConfig.text}</Text>
         </TouchableOpacity>
       </View>
+      
+      <EmergencySosModal 
+        visible={sosVisible} 
+        onClose={() => setSosVisible(false)} 
+        rideId={rideId || ''} 
+        authToken={authToken || ''} 
+      />
     </View>
   );
 };
@@ -127,8 +140,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  iconBtnSOS: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+  },
   iconText: {
     fontSize: 20,
+  },
+  iconTextSOS: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ef4444'
   },
   actionBtn: {
     paddingVertical: 18,

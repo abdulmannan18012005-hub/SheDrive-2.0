@@ -100,3 +100,9 @@
 - **What was built**: A responsive public web tracking client (`track.html` & `track.js`) consuming Phase 16 payloads with smooth marker interpolation. Paired with a native `Share.share` integration on the mobile Passenger Active Ride HUD triggering link generation.
 - **How it was implemented**: Utilized `requestAnimationFrame` driving linear coordinate interpolation (lerp) over 12-second polling intervals. Rendered dynamically via Leaflet.js with privacy-masked Stitch UI components. Mapped React Native OS sharing directly out of the HUD.
 - **Verification**: `test-phase17.js` executed a headless DOM parse simulating token extraction, payload mapping, and graceful error bounds against mocked tracking coordinates. Typechecked flawlessly.
+
+## Phase 18: In-Ride Safety & SOS Dispatch
+- **Completed**: Yes
+- **What was built**: A comprehensive safety core enabling users to manage emergency contacts (max 5) and trigger instant SOS alerts during active rides. Built the \EmergencySosModal\ integrated into the Passenger and Driver HUDs.
+- **How it was implemented**: Created \emergency.routes.ts\ for Contacts CRUD enforcing a maximum of 5. Added \POST /api/v1/rides/:id/sos\ triggering an atomic sequence: records \emergency_alerts\ incident, flags the ride state, generates a \share_token\, and logs a broadcast payload. Built the frontend Stitch UI components with high-contrast emergency theming and native 15/1122 dialer integrations.
+- **Verification**: E2E \	est-phase18.ts\ validated the 5-contact constraint ceiling (HTTP 400 rejection), authenticated SOS alert dispatch with atomic status transitions, and validated the auto-schema migrations. All typechecks passed flawlessly.

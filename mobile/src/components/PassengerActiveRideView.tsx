@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Share, ActivityIndicator, Alert } from 'react-native';
 import { SoundService } from '../services/audio/SoundService';
+import { EmergencySosModal } from './EmergencySosModal';
 
 interface PassengerActiveRideViewProps {
   rideId?: string;
@@ -24,6 +25,7 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
   vehiclePlate
 }) => {
   const [isSharing, setIsSharing] = useState(false);
+  const [sosVisible, setSosVisible] = useState(false);
 
   const handleCall = () => {
     if (driverPhone) {
@@ -39,7 +41,6 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
 
     try {
       setIsSharing(true);
-      // In production this comes from environment config
       const BACKEND_URL = 'http://localhost:3016';
       
       const res = await fetch(`${BACKEND_URL}/api/v1/rides/${rideId}/share`, {
@@ -112,11 +113,18 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
               <Text style={styles.shareBtnText}>Share Trip</Text>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.sosBtn}>
+          <TouchableOpacity style={styles.sosBtn} onPress={() => setSosVisible(true)}>
             <Text style={styles.sosBtnText}>Emergency SOS</Text>
           </TouchableOpacity>
         </View>
       </View>
+      
+      <EmergencySosModal 
+        visible={sosVisible} 
+        onClose={() => setSosVisible(false)} 
+        rideId={rideId || ''} 
+        authToken={authToken || ''} 
+      />
     </View>
   );
 };
