@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/error.middleware';
 import healthRoutes from './routes/health.routes';
+import authRoutes from './routes/auth.routes';
 import { authenticateToken } from './middleware/auth.middleware';
 
 const app = express();
@@ -22,7 +23,7 @@ const authLimiter = rateLimit({
 
 // Routes
 app.use('/api/v1', healthRoutes);
-app.use('/api/v1/auth', authLimiter);
+app.use('/api/v1/auth', authLimiter, authRoutes);
 
 // Dummy protected route for testing
 app.get('/api/v1/protected', authenticateToken, (req, res) => {
