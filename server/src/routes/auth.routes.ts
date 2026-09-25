@@ -145,25 +145,9 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
         // Hash new password
         const passwordHash = await bcrypt.hash(newPassword, 10);
 
-        // Ensure users table exists for test
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                session_version INT DEFAULT 1
-            );
-        `);
-        
-        // Insert dummy user if not exists (for tests)
+        // Update password
         await pool.query(
-            'INSERT INTO users (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING',
-            [email, 'dummy_hash']
-        );
-
-        // Update password and invalidate sessions (increment session_version)
-        await pool.query(
-            'UPDATE users SET password_hash = $1, session_version = session_version + 1 WHERE email = $2',
+            'UPDATE users SET password_hash = $1 WHERE email = $2',
             [passwordHash, email]
         );
 

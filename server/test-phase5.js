@@ -38,18 +38,8 @@ async function runTests() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     `);
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            session_version INT DEFAULT 1
-        );
-    `);
-
     // Clear out the test email
     await client.query("DELETE FROM password_resets WHERE email = 'test@example.com'");
-    await client.query("DELETE FROM users WHERE email = 'test@example.com'");
 
     console.log('Running OTP Flow tests...');
     
@@ -67,13 +57,13 @@ async function runTests() {
     await client.query("UPDATE password_resets SET code_hash = $1 WHERE email = 'test@example.com'", [knownHash]);
     
     // 2. Invalid Attempt Lockout Test
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
         const rErr = await fetch('http://localhost:3002/api/v1/auth/verify-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: 'test@example.com', otp: '000000' }) // Wrong OTP
         });
-        if (i < 2) {
+        if (i < 3) {
             if (rErr.status !== 400) throw new Error('Expected 400 for invalid OTP attempt');
         } else {
             if (rErr.status !== 429) throw new Error(`Expected 429 for lockout, got ${rErr.status}`);
