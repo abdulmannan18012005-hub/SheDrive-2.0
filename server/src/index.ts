@@ -5,6 +5,9 @@ import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/error.middleware';
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
+import profileRoutes from './routes/profile.routes';
+import placesRoutes from './routes/places.routes';
+import feedbackRoutes from './routes/feedback.routes';
 import { authenticateToken } from './middleware/auth.middleware';
 
 const app = express();
@@ -24,6 +27,9 @@ const authLimiter = rateLimit({
 // Routes
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/profile', profileRoutes);
+app.use('/api/v1/places', placesRoutes);
+app.use('/api/v1/feedback', feedbackRoutes);
 
 // Dummy protected route for testing
 app.get('/api/v1/protected', authenticateToken, (req, res) => {
