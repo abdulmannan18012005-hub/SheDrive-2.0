@@ -5,5 +5,6 @@
   - Phase 1.5 (Website Migration & PageSpeed Audit)
   - Phase 2 (Database Initialization - Neon PostgreSQL)
   - Phase 3 (Core API Skeleton & Auth Infrastructure)
-- **Active Phase**: Ready for Phase 4 (Isolated Auth Flows - Mobile)
-- **Active File**: N/A (Awaiting Phase 4 trigger)
+  - Phase 4 (Isolated Auth Flows - Mobile)
+- **Active Phase**: Ready for Phase 5 (OTP & Password Reset Flows)
+- **Active File**: N/A (Awaiting Phase 5 trigger)
