@@ -699,4 +699,195 @@ router.post('/:id/status', authenticateToken, async (req: Request, res: Response
     }
 });
 
+// Auto-migrate schema for Phase 16
+pool.query(`
+    CREATE TABLE IF NOT EXISTS ride_shares (
+        id VARCHAR(64) PRIMARY KEY,
+        ride_id VARCHAR(64) NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
+        share_token VARCHAR(128) UNIQUE NOT NULL,
+        created_by VARCHAR(64) NOT NULL REFERENCES users(id),
+        is_active BOOLEAN DEFAULT true,
+        expires_at BIGINT NOT NULL,
+        created_at BIGINT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ride_shares_token ON ride_shares(share_token);
+`).catch(console.error);
+
+import crypto from 'crypto';
+
+// POST /api/v1/rides/:id/share
+router.post('/:id/share', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const passengerId = (req as any).user.id;
+
+        const rideRes = await pool.query('SELECT passenger_id, status FROM rides WHERE ride_id = $1', [id]);
+        if (rideRes.rowCount === 0 || rideRes.rows[0].passenger_id !== passengerId) {
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+
+        const validStates = ['accepted', 'arrived', 'in_progress'];
+        if (!validStates.includes(rideRes.rows[0].status)) {
+            res.status(400).json({ error: 'Cannot share an inactive ride' });
+            return;
+        }
+
+        const now = Date.now();
+        const expiresAt = now + 4 * 60 * 60 * 1000; // 4 hours
+
+        // Check if active token exists
+        const existingShare = await pool.query(
+            "SELECT share_token FROM ride_shares WHERE ride_id = $1 AND created_by = $2 AND is_active = true AND expires_at > $3",
+            [id, passengerId, now]
+        );
+
+        if (existingShare.rowCount && existingShare.rowCount > 0) {
+            res.status(200).json({
+                share_token: existingShare.rows[0].share_token,
+                share_url: `https://shedrive.pk/track.html?token=${existingShare.rows[0].share_token}`,
+                expires_at: new Date(expiresAt).toISOString()
+            });
+            return;
+        }
+
+        const shareToken = crypto.randomBytes(32).toString('hex');
+        const shareId = `share-${now}-${Math.floor(Math.random()*1000)}`;
+
+        await pool.query(
+            "INSERT INTO ride_shares (id, ride_id, share_token, created_by, is_active, expires_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            [shareId, id, shareToken, passengerId, true, expiresAt, now]
+        );
+
+        res.status(201).json({
+            share_token: shareToken,
+            share_url: `https://shedrive.pk/track.html?token=${shareToken}`,
+            expires_at: new Date(expiresAt).toISOString()
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// DELETE /api/v1/rides/:id/share
+router.delete('/:id/share', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const passengerId = (req as any).user.id;
+        
+        await pool.query(
+            "UPDATE ride_shares SET is_active = false WHERE ride_id = $1 AND created_by = $2",
+            [id, passengerId]
+        );
+        
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Rate limiting map for public tracking endpoint
+const trackingRateLimits: Record<string, { count: number; timestamp: number }> = {};
+
+// GET /api/v1/rides/public-track/:shareToken
+router.get('/public-track/:shareToken', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+        const now = Date.now();
+        
+        if (!trackingRateLimits[clientIp]) {
+            trackingRateLimits[clientIp] = { count: 1, timestamp: now };
+        } else {
+            if (now - trackingRateLimits[clientIp].timestamp > 60000) {
+                trackingRateLimits[clientIp] = { count: 1, timestamp: now };
+            } else {
+                trackingRateLimits[clientIp].count++;
+                if (trackingRateLimits[clientIp].count > 30) {
+                    res.status(429).json({ error: 'Too many tracking requests' });
+                    return;
+                }
+            }
+        }
+
+        const { shareToken } = req.params;
+
+        const shareRes = await pool.query(
+            "SELECT ride_id FROM ride_shares WHERE share_token = $1 AND is_active = true AND expires_at > $2",
+            [shareToken, now]
+        );
+
+        if (!shareRes.rowCount || shareRes.rowCount === 0) {
+            res.status(404).json({ error: 'Tracking link is invalid or has expired' });
+            return;
+        }
+
+        const rideId = shareRes.rows[0].ride_id;
+
+        const rideRes = await pool.query(`
+            SELECT r.ride_id, r.status, r.pickup_label, r.pickup_lat, r.pickup_lng, 
+                   r.dropoff_label, r.dropoff_lat, r.dropoff_lng,
+                   r.started_at, r.completed_at,
+                   p.first_name AS passenger_first_name, p.name AS passenger_name,
+                   d.first_name AS driver_first_name, d.name AS driver_name,
+                   drv.rating AS driver_rating, drv.vehicle_make, drv.vehicle_model, 
+                   drv.vehicle_color, drv.vehicle_plate, drv.vehicle_category,
+                   drv.latitude AS driver_lat, drv.longitude AS driver_lng, 
+                   drv.heading AS driver_heading, drv.speed AS driver_speed, drv.last_location_update
+            FROM rides r
+            LEFT JOIN users p ON r.passenger_id = p.id
+            LEFT JOIN users d ON r.driver_id = d.id
+            LEFT JOIN drivers drv ON r.driver_id = drv.driver_id
+            WHERE r.ride_id = $1
+        `, [rideId]);
+
+        if (rideRes.rowCount === 0) {
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+
+        const ride = rideRes.rows[0];
+
+        const payload = {
+            ride_id: ride.ride_id,
+            status: ride.status,
+            passenger_first_name: ride.passenger_first_name || ride.passenger_name?.split(' ')[0] || 'Passenger',
+            driver_first_name: ride.driver_first_name || ride.driver_name?.split(' ')[0] || 'Driver',
+            driver_rating: Number(ride.driver_rating) || 5.0,
+            vehicle: {
+                make: ride.vehicle_make,
+                model: ride.vehicle_model,
+                color: ride.vehicle_color,
+                plate_number: ride.vehicle_plate,
+                category: ride.vehicle_category
+            },
+            pickup: {
+                address: ride.pickup_label,
+                latitude: ride.pickup_lat,
+                longitude: ride.pickup_lng
+            },
+            dropoff: {
+                address: ride.dropoff_label,
+                latitude: ride.dropoff_lat,
+                longitude: ride.dropoff_lng
+            },
+            driver_live_location: {
+                latitude: ride.driver_lat || null,
+                longitude: ride.driver_lng || null,
+                heading: ride.driver_heading || null,
+                speed: ride.driver_speed || null,
+                last_updated: ride.last_location_update ? new Date(Number(ride.last_location_update)).toISOString() : null
+            },
+            started_at: ride.started_at ? new Date(Number(ride.started_at)).toISOString() : null,
+            completed_at: ride.completed_at ? new Date(Number(ride.completed_at)).toISOString() : null
+        };
+
+        res.status(200).json(payload);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 export default router;

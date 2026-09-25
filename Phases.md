@@ -88,3 +88,9 @@
 - **What was built**: A server-authoritative monotonic state machine governing active rides (`accepted` -> `arrived` -> `in_progress` -> `completed`). Unlocked secure peer-to-peer phone contact payloads strictly matching active states. Integrated mobile HUDs (`PassengerActiveRideView.tsx` and `DriverActiveRideView.tsx`) paired with a milestone `SoundService`.
 - **How it was implemented**: Utilized PostgreSQL row-level locks (`FOR UPDATE`) preventing state mutation races. Enforced explicit transition guards and terminal states safely blocking illegal jumps. Bound physical device dialers securely unmasking payloads post-bidding.
 - **Verification**: `test-phase15.js` confirmed strict compliance against monotonic advancement loops asserting timestamp generations (arrived/started/completed) mapped accurately. Typechecks complete.
+
+## Phase 16: Live Ride Share - Backend Tokenization
+- **Completed**: Yes
+- **What was built**: A secure cryptographic tokenization engine (`POST /share`) allowing passengers to spawn 4-hour active tracking links. Engineered the public unauthenticated proxy (`GET /public-track/:shareToken`) bridging driver telemetry against valid tokens, fortified with in-memory IP rate-limiting.
+- **How it was implemented**: Mapped new `ride_shares` PostgreSQL architecture storing Hex URL-safe strings mapped conditionally to passenger UUID ownerships. Queried telemetry via cross-join filtering guaranteeing absolute zero-leak data exposure (dropping all phones, emails, and exact driver IDs).
+- **Verification**: `test-phase16.js` aggressively fuzzed generated URL hashes, audited JSON payloads confirming absolute absence of sensitive object keys natively, successfully hit 404 targets via revocation logic, and deliberately exhausted API limits confirming 429 bounce barriers. Typechecked cleanly.
