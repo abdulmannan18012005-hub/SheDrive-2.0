@@ -9,5 +9,6 @@
   - Phase 5 (OTP & Password Reset Flows)
   - Phase 6 (Core Profile, Settings & Saved Places)
   - Phase 7 (Driver Document & Vehicle Workflows)
-- **Active Phase**: Ready for Phase 8 (Admin Portal - Verification & Audit)
-- **Active File**: N/A (Awaiting Phase 8 trigger)
+  - Phase 8 (Admin Portal - Verification & Audit)
+- **Active Phase**: Ready for Phase 9 (Google Places Autocomplete Integration)
+- **Active File**: N/A (Awaiting Phase 9 trigger)

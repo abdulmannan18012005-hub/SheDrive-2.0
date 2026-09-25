@@ -37,3 +37,12 @@
   - Mobile Screens: `DriverVehicleSetupScreen.tsx`, `DriverDocumentUploadScreen.tsx`, `DriverVehicleManagementScreen.tsx`, and `DriverStackNavigator.tsx`.
 - **How it was implemented**: Cloudinary proxy defaults to local mock urls securely. Driver Routes enforce the strict 5-tier taxonomy (bike_scooty, mini, car_ac, comfort_ac, family_xl). Implemented the pending state-machine transitions directly on the legacy drivers schema.
 - **Verification**: `npx tsc --noEmit` passed with 0 errors. `test-phase7.js` asserted 400 rejection for invalid categories, simulated document uploads, and verified accurate status state transitions.
+
+## Phase 8: Admin Portal - Verification & Audit
+- **Completed**: Yes
+- **What was built**: 
+  - Admin routes (`server/src/routes/admin.routes.ts`) with strict RBAC middleware.
+  - Immutable Audit Logging Service (`server/src/services/audit.service.ts`) to record approvals, rejections.
+  - Dedicated React web portal (`admin-portal/`) with Dashboard Overview, Verification Queue, and Audit Log Viewer components.
+- **How it was implemented**: Utilized Postgres transactions (BEGIN/COMMIT) for atomic user and driver row state flips (is_verified/vehicle_review_status). Admin Portal built heavily reliant on pure Stitch components (TailwindCSS, Lucide) and connected securely via an Axios interceptor.
+- **Verification**: `npm run build` (React Vite) strictly succeeded. `test-phase8.js` accurately threw 403 Forbidden on wrong roles, asserted database state transitions upon admin verifications, and verified the unforgeable trace of audit logs.
