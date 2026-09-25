@@ -24,6 +24,18 @@ pool.query(`
         address TEXT NOT NULL,
         created_at BIGINT NOT NULL
     );
+
+    DROP TABLE IF EXISTS bids CASCADE;
+    CREATE TABLE bids (
+        id VARCHAR(64) PRIMARY KEY,
+        ride_id VARCHAR(64) NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
+        driver_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        offered_fare NUMERIC NOT NULL,
+        counter_fare NUMERIC,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at BIGINT NOT NULL,
+        expires_at BIGINT NOT NULL
+    );
 `).catch(console.error);
 
 const PRICES = {
@@ -185,6 +197,134 @@ router.post('/:id/cancel', authenticateToken, async (req: Request, res: Response
 
         await pool.query('UPDATE rides SET status = $1, updated_at = $2 WHERE ride_id = $3', ['cancelled', Date.now(), id]);
         res.status(200).json({ success: true, message: 'Ride cancelled successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// GET /api/v1/rides/:id/bids
+router.get('/:id/bids', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const now = Date.now();
+
+        // Auto-cleanup conceptually (we can just filter out expired in the SELECT)
+        // Optionally flag them expired in DB if we want to be thorough:
+        await pool.query("UPDATE bids SET status = 'expired' WHERE ride_id = $1 AND status = 'pending' AND expires_at < $2", [id, now]);
+
+        const bidsRes = await pool.query(`
+            SELECT b.id AS bid_id, b.driver_id, u.name AS driver_name, 
+                   d.rating, d.total_rides, d.vehicle_make, d.vehicle_model, 
+                   d.vehicle_color, d.vehicle_plate, d.vehicle_category, d.vehicle_photo_url,
+                   b.offered_fare, b.expires_at
+            FROM bids b
+            JOIN drivers d ON b.driver_id = d.driver_id
+            JOIN users u ON u.id = d.driver_id
+            WHERE b.ride_id = $1 AND b.status = 'pending' AND b.expires_at > $2
+        `, [id, now]);
+
+        const mappedBids = bidsRes.rows.map(r => ({
+            bid_id: r.bid_id,
+            driver_id: r.driver_id,
+            driver_name: r.driver_name,
+            rating: r.rating,
+            total_rides: r.total_rides,
+            vehicle: {
+                make: r.vehicle_make,
+                model: r.vehicle_model,
+                color: r.vehicle_color,
+                plate: r.vehicle_plate,
+                category: r.vehicle_category,
+                photo_url: r.vehicle_photo_url
+            },
+            offered_fare: Number(r.offered_fare),
+            expires_in_seconds: Math.max(0, Math.floor((Number(r.expires_at) - now) / 1000))
+        }));
+
+        res.status(200).json({ bids: mappedBids });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/:id/bids/:bidId/accept
+router.post('/:id/bids/:bidId/accept', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id, bidId } = req.params;
+        const passengerId = (req as any).user.id;
+        
+        await pool.query('BEGIN');
+        
+        // 1. Verify ride status
+        const rideRes = await pool.query('SELECT status, passenger_id FROM rides WHERE ride_id = $1 FOR UPDATE', [id]);
+        if (rideRes.rowCount === 0) {
+            await pool.query('ROLLBACK');
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+        if (rideRes.rows[0].passenger_id !== passengerId) {
+            await pool.query('ROLLBACK');
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+        if (rideRes.rows[0].status !== 'searching' && rideRes.rows[0].status !== 'requested') {
+            await pool.query('ROLLBACK');
+            res.status(400).json({ error: 'Ride is no longer searching for drivers' });
+            return;
+        }
+
+        // 2. Verify bid status
+        const bidRes = await pool.query('SELECT status, driver_id, offered_fare FROM bids WHERE id = $1 AND ride_id = $2 FOR UPDATE', [bidId, id]);
+        if (bidRes.rowCount === 0) {
+            await pool.query('ROLLBACK');
+            res.status(404).json({ error: 'Bid not found' });
+            return;
+        }
+        if (bidRes.rows[0].status !== 'pending') {
+            await pool.query('ROLLBACK');
+            res.status(400).json({ error: 'Bid is no longer active or pending' });
+            return;
+        }
+        
+        const bid = bidRes.rows[0];
+
+        // 3. Update ride
+        await pool.query(
+            'UPDATE rides SET status = $1, driver_id = $2, final_fare = $3, updated_at = $4 WHERE ride_id = $5',
+            ['accepted', bid.driver_id, bid.offered_fare, Date.now(), id]
+        );
+
+        // 4. Update bids
+        await pool.query('UPDATE bids SET status = $1 WHERE id = $2', ['accepted', bidId]);
+        await pool.query("UPDATE bids SET status = 'declined' WHERE ride_id = $1 AND id != $2 AND status = 'pending'", [id, bidId]);
+
+        await pool.query('COMMIT');
+        
+        const updatedRideRes = await pool.query('SELECT * FROM rides WHERE ride_id = $1', [id]);
+        res.status(200).json({ success: true, ride: updatedRideRes.rows[0] });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/:id/bids/:bidId/decline
+router.post('/:id/bids/:bidId/decline', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id, bidId } = req.params;
+        const passengerId = (req as any).user.id;
+        
+        const rideRes = await pool.query('SELECT passenger_id FROM rides WHERE ride_id = $1', [id]);
+        if (rideRes.rowCount === 0 || rideRes.rows[0].passenger_id !== passengerId) {
+            res.status(403).json({ error: 'Forbidden or Ride not found' });
+            return;
+        }
+
+        await pool.query("UPDATE bids SET status = 'declined' WHERE id = $1 AND ride_id = $2 AND status = 'pending'", [bidId, id]);
+        res.status(200).json({ success: true });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal Server Error' });

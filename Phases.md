@@ -64,3 +64,9 @@
 - **What was built**: Dynamic fare estimation across 5 vehicle categories, route calculation endpoints, ride request persistence (`rides` and `ride_stops` tables), and React Native Stitch UI booking sheets (`RideEstimateSheet`, `RideSearchingView`).
 - **How it was implemented**: Utilized a pricing algorithm mapping distances to base fares and per-km rates. Used a safe `DO` block in PostgreSQL to relax tight `status` constraints without losing row schemas. Booking sheets manage React state to negotiate bids (-50/+50) and feature radar pulse animations.
 - **Verification**: `test-phase11.js` E2E test proved the DB inserts, estimates math, and status transitions to `cancelled`. Typechecks passed with zero errors.
+
+## Phase 12: Passenger Bidding & Offer Engine
+- **Completed**: Yes
+- **What was built**: A modernized `bids` architecture mapping UUIDs across rides and drivers, replacing generic chats. A passenger retrieval endpoint filtering 10s TTL expiration logic. Atomic PostgreSQL transactions executing single-shot acceptances ensuring driver locking while mass-declining competing bids. Mobile InDrive bidding UI component (`PassengerBiddingSheet.tsx`).
+- **How it was implemented**: PostgreSQL `BEGIN...COMMIT` locks row updates. Front-end relies heavily on `setInterval` hooks clearing cleanly on sub-1s increments, wrapping Animated properties securely to prevent unmounted leakage.
+- **Verification**: `test-phase12.js` simulated concurrent active/expired bids successfully proving TTL filters, single declines, and massive state rollovers upon bid acceptance. Typechecks fully clean.
