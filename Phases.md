@@ -76,3 +76,9 @@
 - **What was built**: A feed endpoint matching available requested rides directly to driver vehicle tiers alongside real-time bidding sheet capabilities. Added counter-offer posting architecture locking strictly 1 bid per driver on each ride. Created UI sheets `DriverRideFeedCard.tsx` and `DriverCounterOfferSheet.tsx`.
 - **How it was implemented**: Utilized PostgreSQL row existence queries tracking `driver_id` + `ride_id` to throttle limiters. Joined user profiles implicitly across searching statuses. Built independent 10s lockout mechanisms directly into driver UIs utilizing decoupled interval tracking.
 - **Verification**: `test-phase13.js` verified accurate SQL feed filtering against passenger metadata, simulated successful initial bids and strictly asserted HTTP 400 rejection across sequential counter-offers. Mobile components completely TS strict compliant.
+
+## Phase 14: Mutual Profile Inspection - Pre-Ride
+- **Completed**: Yes
+- **What was built**: A dual-pronged inspection layer permitting cross-examination of drivers and passengers before ride confirmation. Built strictly sanitized endpoints (`/driver-profile/:driverId` and `/passenger-profile`) enforcing data privacy (shielding phones, emails, and CNICs). Rendered `PreRideDriverProfileModal.tsx` and `PreRidePassengerProfileModal.tsx` via React Native Modal layers.
+- **How it was implemented**: Utilized explicit SQL field projections omitting sensitive columns natively at the DB query level. Encapsulated modal mounting states independent of active bidding timers ensuring seamless background ticks during profile viewing.
+- **Verification**: `test-phase14.js` verified strictly authorized profiles while ensuring absolute JSON undefined validation on targeted restricted strings. Typechecks completely successful.

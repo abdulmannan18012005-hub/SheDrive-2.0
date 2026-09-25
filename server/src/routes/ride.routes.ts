@@ -430,4 +430,114 @@ router.post('/:id/bids/:bidId/withdraw', authenticateToken, requireRole('driver'
     }
 });
 
+// GET /api/v1/rides/:id/driver-profile/:driverId
+router.get('/:id/driver-profile/:driverId', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id, driverId } = req.params;
+        const passengerId = (req as any).user.id;
+        
+        // Validate ride belongs to passenger
+        const rideRes = await pool.query('SELECT passenger_id FROM rides WHERE ride_id = $1', [id]);
+        if (rideRes.rowCount === 0 || rideRes.rows[0].passenger_id !== passengerId) {
+            res.status(403).json({ error: 'Forbidden: Ride does not belong to you' });
+            return;
+        }
+
+        // Validate driver has bid on this ride
+        const bidRes = await pool.query("SELECT id FROM bids WHERE ride_id = $1 AND driver_id = $2", [id, driverId]);
+        if (bidRes.rowCount === 0) {
+            res.status(403).json({ error: 'Forbidden: Driver has not bid on this ride' });
+            return;
+        }
+
+        // Fetch sanitized profile
+        const driverProfileRes = await pool.query(`
+            SELECT u.first_name, u.name, u.is_verified, u.created_at,
+                   d.rating, d.total_rides, d.vehicle_make, d.vehicle_model, 
+                   d.vehicle_year, d.vehicle_color, d.vehicle_plate, d.vehicle_category, d.vehicle_photo_url
+            FROM users u
+            JOIN drivers d ON u.id = d.driver_id
+            WHERE u.id = $1
+        `, [driverId]);
+
+        if (driverProfileRes.rowCount === 0) {
+            res.status(404).json({ error: 'Driver profile not found' });
+            return;
+        }
+
+        const row = driverProfileRes.rows[0];
+        const profile = {
+            driver_id: driverId,
+            first_name: row.first_name || row.name.split(' ')[0],
+            avatar_url: null, // Hardcoded due to DB schema not having it yet
+            rating: Number(row.rating),
+            total_rides: row.total_rides,
+            is_verified: row.is_verified,
+            member_since: new Date(Number(row.created_at)).toISOString(),
+            vehicle: {
+                make: row.vehicle_make,
+                model: row.vehicle_model,
+                year: parseInt(row.vehicle_year || '2022', 10),
+                color: row.vehicle_color,
+                plate_number: row.vehicle_plate,
+                category: row.vehicle_category,
+                photo_url: row.vehicle_photo_url
+            }
+        };
+
+        res.status(200).json(profile);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// GET /api/v1/rides/:id/passenger-profile
+router.get('/:id/passenger-profile', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const driverId = (req as any).user.id;
+        
+        // Verify driver has bid OR ride is open for them
+        const rideRes = await pool.query("SELECT passenger_id, status FROM rides WHERE ride_id = $1", [id]);
+        if (rideRes.rowCount === 0) {
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+        
+        const ride = rideRes.rows[0];
+        const bidRes = await pool.query("SELECT id FROM bids WHERE ride_id = $1 AND driver_id = $2", [id, driverId]);
+        
+        if (ride.status !== 'searching' && bidRes.rowCount === 0) {
+            res.status(403).json({ error: 'Forbidden: Ride is not searching and you have not bid on it' });
+            return;
+        }
+
+        const passengerProfileRes = await pool.query(`
+            SELECT first_name, name, created_at, is_verified 
+            FROM users WHERE id = $1
+        `, [ride.passenger_id]);
+
+        if (passengerProfileRes.rowCount === 0) {
+            res.status(404).json({ error: 'Passenger profile not found' });
+            return;
+        }
+
+        const row = passengerProfileRes.rows[0];
+        const profile = {
+            passenger_id: ride.passenger_id,
+            first_name: row.first_name || row.name.split(' ')[0],
+            avatar_url: null,
+            is_phone_verified: row.is_verified,
+            member_since: new Date(Number(row.created_at)).toISOString(),
+            safety_badge: "Verified Female Passenger"
+        };
+
+        res.status(200).json(profile);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 export default router;
