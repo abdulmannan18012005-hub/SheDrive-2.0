@@ -8,6 +8,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 
 import ProfileStackNavigator from './ProfileStackNavigator';
 import DriverStackNavigator from './DriverStackNavigator';
+import LocationSearchScreen from '../screens/search/LocationSearchScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +26,7 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="App" component={ProfileStackNavigator} />
             <Stack.Screen name="DriverFlow" component={DriverStackNavigator} />
+            <Stack.Screen name="LocationSearch" component={LocationSearchScreen} />
           </>
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />
