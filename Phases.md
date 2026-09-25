@@ -82,3 +82,9 @@
 - **What was built**: A dual-pronged inspection layer permitting cross-examination of drivers and passengers before ride confirmation. Built strictly sanitized endpoints (`/driver-profile/:driverId` and `/passenger-profile`) enforcing data privacy (shielding phones, emails, and CNICs). Rendered `PreRideDriverProfileModal.tsx` and `PreRidePassengerProfileModal.tsx` via React Native Modal layers.
 - **How it was implemented**: Utilized explicit SQL field projections omitting sensitive columns natively at the DB query level. Encapsulated modal mounting states independent of active bidding timers ensuring seamless background ticks during profile viewing.
 - **Verification**: `test-phase14.js` verified strictly authorized profiles while ensuring absolute JSON undefined validation on targeted restricted strings. Typechecks completely successful.
+
+## Phase 15: Active Ride State Machine & Audio Cues
+- **Completed**: Yes
+- **What was built**: A server-authoritative monotonic state machine governing active rides (`accepted` -> `arrived` -> `in_progress` -> `completed`). Unlocked secure peer-to-peer phone contact payloads strictly matching active states. Integrated mobile HUDs (`PassengerActiveRideView.tsx` and `DriverActiveRideView.tsx`) paired with a milestone `SoundService`.
+- **How it was implemented**: Utilized PostgreSQL row-level locks (`FOR UPDATE`) preventing state mutation races. Enforced explicit transition guards and terminal states safely blocking illegal jumps. Bound physical device dialers securely unmasking payloads post-bidding.
+- **Verification**: `test-phase15.js` confirmed strict compliance against monotonic advancement loops asserting timestamp generations (arrived/started/completed) mapped accurately. Typechecks complete.

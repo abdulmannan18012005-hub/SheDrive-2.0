@@ -540,4 +540,163 @@ router.get('/:id/passenger-profile', authenticateToken, requireRole('driver'), a
     }
 });
 
+// Auto-migrate schema for Phase 15
+pool.query(`
+    ALTER TABLE rides ADD COLUMN IF NOT EXISTS arrived_at BIGINT;
+    ALTER TABLE rides ADD COLUMN IF NOT EXISTS started_at BIGINT;
+    ALTER TABLE rides ADD COLUMN IF NOT EXISTS completed_at BIGINT;
+`).catch(console.error);
+
+// GET /api/v1/rides/:id/active
+router.get('/:id/active', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = (req as any).user.id;
+        
+        const rideRes = await pool.query(`
+            SELECT r.*, 
+                   p.name AS passenger_name, p.phone AS passenger_phone, p.first_name AS passenger_first_name,
+                   d.name AS driver_name, d.phone AS driver_phone, d.first_name AS driver_first_name,
+                   drv.vehicle_make, drv.vehicle_model, drv.vehicle_color, drv.vehicle_plate, drv.rating AS driver_rating
+            FROM rides r
+            LEFT JOIN users p ON r.passenger_id = p.id
+            LEFT JOIN users d ON r.driver_id = d.id
+            LEFT JOIN drivers drv ON r.driver_id = drv.driver_id
+            WHERE r.ride_id = $1
+        `, [id]);
+
+        if (rideRes.rowCount === 0) {
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+
+        const ride = rideRes.rows[0];
+        if (ride.passenger_id !== userId && ride.driver_id !== userId) {
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+
+        const allowedUnmaskStates = ['accepted', 'arrived', 'in_progress'];
+        const isUnmasked = allowedUnmaskStates.includes(ride.status);
+
+        const payload = {
+            ride_id: ride.ride_id,
+            status: ride.status,
+            pickup_label: ride.pickup_label,
+            dropoff_label: ride.dropoff_label,
+            pickup_lat: ride.pickup_lat,
+            pickup_lng: ride.pickup_lng,
+            dropoff_lat: ride.dropoff_lat,
+            dropoff_lng: ride.dropoff_lng,
+            final_fare: ride.final_fare || ride.offered_fare,
+            passenger: {
+                id: ride.passenger_id,
+                name: isUnmasked ? ride.passenger_name : (ride.passenger_first_name || 'Passenger'),
+                phone: isUnmasked ? ride.passenger_phone : null
+            },
+            driver: ride.driver_id ? {
+                id: ride.driver_id,
+                name: isUnmasked ? ride.driver_name : (ride.driver_first_name || 'Driver'),
+                phone: isUnmasked ? ride.driver_phone : null,
+                rating: Number(ride.driver_rating) || 5.0,
+                vehicle: {
+                    make: ride.vehicle_make,
+                    model: ride.vehicle_model,
+                    color: ride.vehicle_color,
+                    plate: ride.vehicle_plate
+                }
+            } : null
+        };
+
+        res.status(200).json({ active_ride: payload });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/:id/status
+router.post('/:id/status', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = (req as any).user.id;
+        const userRole = (req as any).user.role;
+        const { status, cancellation_reason } = req.body;
+        
+        await pool.query('BEGIN');
+
+        const rideRes = await pool.query('SELECT status, passenger_id, driver_id FROM rides WHERE ride_id = $1 FOR UPDATE', [id]);
+        if (rideRes.rowCount === 0) {
+            await pool.query('ROLLBACK');
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+
+        const ride = rideRes.rows[0];
+        
+        // Authorization
+        if (userRole === 'driver' && ride.driver_id !== userId) {
+            await pool.query('ROLLBACK');
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+        if (userRole === 'passenger' && ride.passenger_id !== userId) {
+            await pool.query('ROLLBACK');
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+
+        // Terminal state check
+        if (ride.status === 'completed' || ride.status === 'cancelled') {
+            await pool.query('ROLLBACK');
+            res.status(400).json({ error: 'Ride is in a terminal state' });
+            return;
+        }
+
+        // State Machine validation
+        const validTransitions: Record<string, string[]> = {
+            'accepted': ['arrived', 'cancelled'],
+            'arrived': ['in_progress', 'cancelled'],
+            'in_progress': ['completed', 'cancelled']
+        };
+
+        const allowed = validTransitions[ride.status];
+        if (!allowed || !allowed.includes(status)) {
+            await pool.query('ROLLBACK');
+            res.status(400).json({ error: `Invalid state transition from ${ride.status} to ${status}` });
+            return;
+        }
+
+        // Apply Transition
+        const now = Date.now();
+        let updateQuery = 'UPDATE rides SET status = $1, updated_at = $2';
+        const params: any[] = [status, now];
+        let paramIndex = 3;
+
+        if (status === 'arrived') {
+            updateQuery += `, arrived_at = $${paramIndex++}`;
+            params.push(now);
+        } else if (status === 'in_progress') {
+            updateQuery += `, started_at = $${paramIndex++}`;
+            params.push(now);
+        } else if (status === 'completed') {
+            updateQuery += `, completed_at = $${paramIndex++}`;
+            params.push(now);
+        }
+
+        updateQuery += ` WHERE ride_id = $${paramIndex}`;
+        params.push(id);
+
+        await pool.query(updateQuery, params);
+        await pool.query('COMMIT');
+
+        const updated = await pool.query('SELECT * FROM rides WHERE ride_id = $1', [id]);
+        res.status(200).json({ success: true, ride: updated.rows[0] });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 export default router;
