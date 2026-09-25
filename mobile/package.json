@@ -7,6 +7,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "expo-location": "~17.0.1",
+    "expo-task-manager": "~11.8.2",
     "typescript": "^5.0.0"
   },
   "devDependencies": {

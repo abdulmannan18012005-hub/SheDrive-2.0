@@ -10,6 +10,7 @@ import placesRoutes from './routes/places.routes';
 import feedbackRoutes from './routes/feedback.routes';
 import driverRoutes from './routes/driver.routes';
 import adminRoutes from './routes/admin.routes';
+import telemetryRoutes from './routes/telemetry.routes';
 import { authenticateToken } from './middleware/auth.middleware';
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/v1/places', placesRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/telemetry', telemetryRoutes);
 
 // Dummy protected route for testing
 app.get('/api/v1/protected', authenticateToken, (req, res) => {

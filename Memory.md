@@ -11,5 +11,6 @@
   - Phase 7 (Driver Document & Vehicle Workflows)
   - Phase 8 (Admin Portal - Verification & Audit)
   - Phase 9 (Google Places Autocomplete)
-- **Active Phase**: Ready for Phase 10 (Background Telemetry Foundation)
-- **Active File**: N/A (Awaiting Phase 10 trigger)
+  - Phase 10 (Background Telemetry Foundation)
+- **Active Phase**: Ready for Phase 11 (Ride Request & Routing)
+- **Active File**: N/A (Awaiting Phase 11 trigger)
