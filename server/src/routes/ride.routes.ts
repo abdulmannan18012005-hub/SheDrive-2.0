@@ -151,6 +151,38 @@ router.post('/request', authenticateToken, requireRole('passenger'), async (req:
     }
 });
 
+// GET /api/v1/rides/available
+router.get('/available', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const driverId = (req as any).user.id;
+        
+        // Fetch driver's category
+        const driverRes = await pool.query('SELECT vehicle_category FROM drivers WHERE driver_id = $1', [driverId]);
+        if (driverRes.rowCount === 0) {
+            res.status(403).json({ error: 'Driver profile not found' });
+            return;
+        }
+        const category = driverRes.rows[0].vehicle_category;
+
+        // Fetch rides matching category
+        const ridesRes = await pool.query(`
+            SELECT r.ride_id, r.passenger_id, u.name AS passenger_name, 
+                   5.0 AS rating, 10 AS total_rides,
+                   r.pickup_label, r.dropoff_label, r.distance_km, r.duration_min, r.offered_fare
+            FROM rides r
+            JOIN users u ON u.id = r.passenger_id
+            WHERE r.status = 'searching' AND r.vehicle_category = $1
+            ORDER BY r.created_at DESC
+            LIMIT 20
+        `, [category]);
+
+        res.status(200).json({ rides: ridesRes.rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // GET /api/v1/rides/:id
 router.get('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
     try {
@@ -324,6 +356,73 @@ router.post('/:id/bids/:bidId/decline', authenticateToken, requireRole('passenge
         }
 
         await pool.query("UPDATE bids SET status = 'declined' WHERE id = $1 AND ride_id = $2 AND status = 'pending'", [bidId, id]);
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/:id/bids
+router.post('/:id/bids', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const driverId = (req as any).user.id;
+        const { offered_fare } = req.body;
+
+        if (!offered_fare) {
+            res.status(400).json({ error: 'Missing offered_fare' });
+            return;
+        }
+
+        const rideRes = await pool.query("SELECT status FROM rides WHERE ride_id = $1", [id]);
+        if (rideRes.rowCount === 0 || rideRes.rows[0].status !== 'searching') {
+            res.status(400).json({ error: 'Ride is not available for bidding' });
+            return;
+        }
+
+        const driverRes = await pool.query("SELECT u.is_verified FROM users u WHERE u.id = $1", [driverId]);
+        if (driverRes.rowCount === 0 || !driverRes.rows[0].is_verified) {
+            res.status(403).json({ error: 'Driver is not verified' });
+            return;
+        }
+
+        const existingBid = await pool.query("SELECT id FROM bids WHERE ride_id = $1 AND driver_id = $2 AND status = 'pending'", [id, driverId]);
+        if (existingBid.rowCount && existingBid.rowCount > 0) {
+            res.status(400).json({ error: 'Only one counter-offer allowed per ride' });
+            return;
+        }
+
+        const bidId = `bid-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        const now = Date.now();
+        const expiresAt = now + 10000;
+
+        await pool.query(
+            "INSERT INTO bids (id, ride_id, driver_id, offered_fare, status, created_at, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            [bidId, id, driverId, offered_fare, 'pending', now, expiresAt]
+        );
+
+        const newBid = await pool.query("SELECT * FROM bids WHERE id = $1", [bidId]);
+        res.status(201).json({ bid: newBid.rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/:id/bids/:bidId/withdraw
+router.post('/:id/bids/:bidId/withdraw', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id, bidId } = req.params;
+        const driverId = (req as any).user.id;
+        
+        const bidRes = await pool.query('SELECT driver_id FROM bids WHERE id = $1 AND ride_id = $2', [bidId, id]);
+        if (bidRes.rowCount === 0 || bidRes.rows[0].driver_id !== driverId) {
+            res.status(403).json({ error: 'Forbidden or Bid not found' });
+            return;
+        }
+
+        await pool.query("UPDATE bids SET status = 'declined' WHERE id = $1 AND status = 'pending'", [bidId]);
         res.status(200).json({ success: true });
     } catch (err) {
         console.error(err);

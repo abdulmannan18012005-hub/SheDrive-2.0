@@ -70,3 +70,9 @@
 - **What was built**: A modernized `bids` architecture mapping UUIDs across rides and drivers, replacing generic chats. A passenger retrieval endpoint filtering 10s TTL expiration logic. Atomic PostgreSQL transactions executing single-shot acceptances ensuring driver locking while mass-declining competing bids. Mobile InDrive bidding UI component (`PassengerBiddingSheet.tsx`).
 - **How it was implemented**: PostgreSQL `BEGIN...COMMIT` locks row updates. Front-end relies heavily on `setInterval` hooks clearing cleanly on sub-1s increments, wrapping Animated properties securely to prevent unmounted leakage.
 - **Verification**: `test-phase12.js` simulated concurrent active/expired bids successfully proving TTL filters, single declines, and massive state rollovers upon bid acceptance. Typechecks fully clean.
+
+## Phase 13: Driver Counter-Offer Engine
+- **Completed**: Yes
+- **What was built**: A feed endpoint matching available requested rides directly to driver vehicle tiers alongside real-time bidding sheet capabilities. Added counter-offer posting architecture locking strictly 1 bid per driver on each ride. Created UI sheets `DriverRideFeedCard.tsx` and `DriverCounterOfferSheet.tsx`.
+- **How it was implemented**: Utilized PostgreSQL row existence queries tracking `driver_id` + `ride_id` to throttle limiters. Joined user profiles implicitly across searching statuses. Built independent 10s lockout mechanisms directly into driver UIs utilizing decoupled interval tracking.
+- **Verification**: `test-phase13.js` verified accurate SQL feed filtering against passenger metadata, simulated successful initial bids and strictly asserted HTTP 400 rejection across sequential counter-offers. Mobile components completely TS strict compliant.

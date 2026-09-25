@@ -14,5 +14,6 @@
   - Phase 10 (Background Telemetry Foundation)
   - Phase 11 (Ride Request & Routing Engine)
   - Phase 12 (Passenger Bidding & Offer Engine)
-- **Active Phase**: Ready for Phase 13 (InDrive-Style Bidding - Driver Counter-Offer Engine)
-- **Active File**: N/A (Awaiting Phase 13 trigger)
+  - Phase 13 (Driver Counter-Offer Engine)
+- **Active Phase**: Ready for Phase 14 (Mutual Profile Inspection - Pre-Ride)
+- **Active File**: N/A (Awaiting Phase 14 trigger)
