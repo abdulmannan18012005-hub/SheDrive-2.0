@@ -1,0 +1,12 @@
+{
+  "name": "admin-portal",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "echo \"Linting admin-portal...\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0"
+  }
+}
