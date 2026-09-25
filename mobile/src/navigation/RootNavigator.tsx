@@ -7,6 +7,7 @@ import SplashScreen from '../screens/auth/SplashScreen';
 import { View, Text, TouchableOpacity } from 'react-native';
 
 import ProfileStackNavigator from './ProfileStackNavigator';
+import DriverStackNavigator from './DriverStackNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,7 +22,10 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {auth?.isAuthenticated ? (
-          <Stack.Screen name="App" component={ProfileStackNavigator} />
+          <>
+            <Stack.Screen name="App" component={ProfileStackNavigator} />
+            <Stack.Screen name="DriverFlow" component={DriverStackNavigator} />
+          </>
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />
         )}

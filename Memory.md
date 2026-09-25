@@ -8,5 +8,6 @@
   - Phase 4 (Isolated Auth Flows - Mobile)
   - Phase 5 (OTP & Password Reset Flows)
   - Phase 6 (Core Profile, Settings & Saved Places)
-- **Active Phase**: Ready for Phase 7 (Driver Document & Vehicle Workflows)
-- **Active File**: N/A (Awaiting Phase 7 trigger)
+  - Phase 7 (Driver Document & Vehicle Workflows)
+- **Active Phase**: Ready for Phase 8 (Admin Portal - Verification & Audit)
+- **Active File**: N/A (Awaiting Phase 8 trigger)
