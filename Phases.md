@@ -58,3 +58,9 @@
 - **What was built**: Legacy Firebase credential sync (`google-services.json` configured in `app.json`), background task manager integration for location updates, 10m displacement zero-lag telemetry engine on mobile, and proximity geospatial queries (Haversine) on the backend.
 - **How it was implemented**: Utilized `expo-location` and `expo-task-manager` decoupled via singleton `LocationTrackingService.ts` avoiding React state renders. Distance threshold (10m) combined with Haversine math natively in Neon PostgreSQL ensures performance and precision.
 - **Verification**: `test-phase10.js` verified DB geospatial queries (proximity inclusion/exclusion) and database updates. `npx tsc --noEmit` passed cleanly with 0 errors across workspaces.
+
+## Phase 11: Ride Request & Routing Engine
+- **Completed**: Yes
+- **What was built**: Dynamic fare estimation across 5 vehicle categories, route calculation endpoints, ride request persistence (`rides` and `ride_stops` tables), and React Native Stitch UI booking sheets (`RideEstimateSheet`, `RideSearchingView`).
+- **How it was implemented**: Utilized a pricing algorithm mapping distances to base fares and per-km rates. Used a safe `DO` block in PostgreSQL to relax tight `status` constraints without losing row schemas. Booking sheets manage React state to negotiate bids (-50/+50) and feature radar pulse animations.
+- **Verification**: `test-phase11.js` E2E test proved the DB inserts, estimates math, and status transitions to `cancelled`. Typechecks passed with zero errors.

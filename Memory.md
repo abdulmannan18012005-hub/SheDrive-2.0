@@ -12,5 +12,6 @@
   - Phase 8 (Admin Portal - Verification & Audit)
   - Phase 9 (Google Places Autocomplete)
   - Phase 10 (Background Telemetry Foundation)
-- **Active Phase**: Ready for Phase 11 (Ride Request & Routing)
-- **Active File**: N/A (Awaiting Phase 11 trigger)
+  - Phase 11 (Ride Request & Routing Engine)
+- **Active Phase**: Ready for Phase 12 (InDrive-Style Bidding - Passenger Offer Engine)
+- **Active File**: N/A (Awaiting Phase 12 trigger)

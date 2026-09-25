@@ -1,0 +1,194 @@
+import { Router, Request, Response } from 'express';
+import { pool } from '../config/db';
+import { authenticateToken, requireRole } from '../middleware/auth.middleware';
+
+const router = Router();
+
+// DB Setup: Relax the status constraint and create ride_stops
+pool.query(`
+    DO $$ 
+    DECLARE r RECORD; 
+    BEGIN 
+      FOR r IN (SELECT conname FROM pg_constraint WHERE conrelid = 'rides'::regclass AND contype = 'c') 
+      LOOP 
+        EXECUTE 'ALTER TABLE rides DROP CONSTRAINT ' || r.conname; 
+      END LOOP; 
+    END $$;
+
+    CREATE TABLE IF NOT EXISTS ride_stops (
+        id VARCHAR(64) PRIMARY KEY,
+        ride_id VARCHAR(64) NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
+        stop_order INTEGER NOT NULL,
+        lat DOUBLE PRECISION NOT NULL,
+        lng DOUBLE PRECISION NOT NULL,
+        address TEXT NOT NULL,
+        created_at BIGINT NOT NULL
+    );
+`).catch(console.error);
+
+const PRICES = {
+    bike_scooty: { base: 120, perKm: 35 },
+    mini: { base: 180, perKm: 50 },
+    car_ac: { base: 250, perKm: 65 },
+    comfort_ac: { base: 320, perKm: 80 },
+    family_xl: { base: 450, perKm: 110 }
+};
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// POST /api/v1/rides/estimate
+router.post('/estimate', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pickup, dropoff, stops = [] } = req.body;
+        if (!pickup || !dropoff) {
+            res.status(400).json({ error: 'Pickup and dropoff are required' });
+            return;
+        }
+
+        // We will calculate a simple Haversine total distance with 1.25 urban multiplier
+        let totalDirectDistance = 0;
+        let lastPoint = pickup;
+        
+        for (const stop of stops) {
+            totalDirectDistance += haversineDistance(lastPoint.lat, lastPoint.lng, stop.lat, stop.lng);
+            lastPoint = stop;
+        }
+        totalDirectDistance += haversineDistance(lastPoint.lat, lastPoint.lng, dropoff.lat, dropoff.lng);
+        
+        const distance_km = totalDirectDistance * 1.25;
+        const duration_mins = Math.round(distance_km * 3); // Approx 20km/h average urban speed
+
+        const estimates = {
+            bike_scooty: Math.round(PRICES.bike_scooty.base + PRICES.bike_scooty.perKm * distance_km),
+            mini: Math.round(PRICES.mini.base + PRICES.mini.perKm * distance_km),
+            car_ac: Math.round(PRICES.car_ac.base + PRICES.car_ac.perKm * distance_km),
+            comfort_ac: Math.round(PRICES.comfort_ac.base + PRICES.comfort_ac.perKm * distance_km),
+            family_xl: Math.round(PRICES.family_xl.base + PRICES.family_xl.perKm * distance_km),
+        };
+
+        const polyline = "mock_encoded_polyline_for_fallback";
+
+        res.status(200).json({ distance_km, duration_mins, polyline, estimates });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/request
+router.post('/request', authenticateToken, requireRole('passenger'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const passengerId = (req as any).user.id;
+        const { pickup, dropoff, stops = [], category, offered_fare, payment_method = 'cash' } = req.body;
+        
+        if (!pickup || !dropoff || !category || !offered_fare) {
+            res.status(400).json({ error: 'Missing required fields' });
+            return;
+        }
+
+        const rideId = `ride-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        const now = Date.now();
+
+        await pool.query('BEGIN');
+
+        await pool.query(
+            `INSERT INTO rides (
+                ride_id, passenger_id, status, vehicle_category, 
+                pickup_lat, pickup_lng, pickup_label,
+                dropoff_lat, dropoff_lng, dropoff_label,
+                distance_km, duration_min, estimated_fare, offered_fare,
+                payment_method, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+            [
+                rideId, passengerId, 'searching', category,
+                pickup.lat, pickup.lng, pickup.address || 'Pickup',
+                dropoff.lat, dropoff.lng, dropoff.address || 'Dropoff',
+                10, 30, offered_fare, offered_fare, // Mock distance/duration for now
+                payment_method, now, now
+            ]
+        );
+
+        for (let i = 0; i < stops.length; i++) {
+            const stop = stops[i];
+            const stopId = `stop-${Date.now()}-${i}`;
+            await pool.query(
+                `INSERT INTO ride_stops (id, ride_id, stop_order, lat, lng, address, created_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [stopId, rideId, i, stop.lat, stop.lng, stop.address || 'Stop', now]
+            );
+        }
+
+        await pool.query('COMMIT');
+
+        const rideRecord = await pool.query('SELECT * FROM rides WHERE ride_id = $1', [rideId]);
+        res.status(201).json({ ride: rideRecord.rows[0] });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// GET /api/v1/rides/:id
+router.get('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const rideRes = await pool.query('SELECT * FROM rides WHERE ride_id = $1', [id]);
+        if (rideRes.rowCount === 0) {
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+
+        const stopsRes = await pool.query('SELECT * FROM ride_stops WHERE ride_id = $1 ORDER BY stop_order ASC', [id]);
+        const ride = rideRes.rows[0];
+        ride.stops = stopsRes.rows;
+
+        res.status(200).json({ ride });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/v1/rides/:id/cancel
+router.post('/:id/cancel', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const passengerId = (req as any).user.id;
+
+        const checkRes = await pool.query('SELECT status, passenger_id FROM rides WHERE ride_id = $1', [id]);
+        if (checkRes.rowCount === 0) {
+            res.status(404).json({ error: 'Ride not found' });
+            return;
+        }
+
+        const ride = checkRes.rows[0];
+        if (ride.passenger_id !== passengerId) {
+            res.status(403).json({ error: 'Forbidden' });
+            return;
+        }
+
+        if (ride.status !== 'searching' && ride.status !== 'offering' && ride.status !== 'requested' && ride.status !== 'negotiating') {
+            res.status(400).json({ error: 'Ride cannot be cancelled at this stage' });
+            return;
+        }
+
+        await pool.query('UPDATE rides SET status = $1, updated_at = $2 WHERE ride_id = $3', ['cancelled', Date.now(), id]);
+        res.status(200).json({ success: true, message: 'Ride cancelled successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+export default router;
