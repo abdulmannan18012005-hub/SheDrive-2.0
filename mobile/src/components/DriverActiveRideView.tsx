@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native'
 import { SoundService } from '../services/audio/SoundService';
 import { EmergencySosModal } from './EmergencySosModal';
 import { DriverCashCollectionModal } from './DriverCashCollectionModal';
+import { DriverRatingModal } from './DriverRatingModal';
 
 interface DriverActiveRideViewProps {
   rideId?: string;
@@ -22,6 +23,7 @@ export const DriverActiveRideView: React.FC<DriverActiveRideViewProps> = ({
   onUpdateStatus
 }) => {
   const [sosVisible, setSosVisible] = useState(false);
+  const [ratingVisible, setRatingVisible] = useState(false);
 
   const handleCall = () => {
     if (passengerPhone) {
@@ -90,11 +92,17 @@ export const DriverActiveRideView: React.FC<DriverActiveRideViewProps> = ({
       />
 
       <DriverCashCollectionModal
-        visible={status === 'completed'}
-        fare={500} // Temporary mock fare, in a real app this would come from props
+        visible={status === 'completed' && !ratingVisible}
+        fare={500} // Mock
         onConfirm={() => {
-          // Close modal or navigate away handled upstream usually, but for UI smoke test we render it when completed
+          setRatingVisible(true);
         }}
+      />
+      <DriverRatingModal
+        visible={ratingVisible}
+        passengerName={passengerName}
+        onSubmit={async (r, t) => setRatingVisible(false)}
+        onSkip={() => setRatingVisible(false)}
       />
     </View>
   );

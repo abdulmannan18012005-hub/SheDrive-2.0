@@ -27,3 +27,9 @@
 ## Phase 19 Updates
 - Mapped existing legacy \payment_transactions\ table constraints. Discovered that \provider\ and \updated_at\ were strict NOT NULL legacy constraints, along with a \payment_transactions_status_check\ validating \success\. Addressed schema migrations dynamically via \ALTER TABLE\ statements injecting \payer_id\ and \payee_id\.
 - Mobile components \DriverCashCollectionModal\ and \PassengerRideSummaryModal\ successfully designed and integrated into their respective Active Ride HUDs based on ride completion state.
+
+## Phase 20 Updates
+- Reset legacy \atings\ table to conform exactly to Phase 20 requirements via a \DROP CASCADE\ -> \CREATE TABLE\ migration natively mapped in \ating.routes.ts\. This resolved old schema collision constraints ensuring \	ags\ array indexing and \unique_ride_rater\ bounds could be strictly enforced.
+- Mapped 100% of the passenger and driver mutual rating constraints on \	est-phase20.ts\. Required patching \setupTestData()\ logic enforcing \users\ uniqueness on \cnic\, \phone\, and \email\ arrays, and strictly mapping missing NOT NULL \drivers\ table fields (like \ehicle_make\, \ehicle_model\, \ehicle_plate\, \ehicle_color\, and \last_location_update\).
+- Ready for Phase 21 (Completed Rides History & Filtering).
+

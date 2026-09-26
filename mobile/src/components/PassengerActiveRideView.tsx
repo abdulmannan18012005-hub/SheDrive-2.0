@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Linking, Share, ActivityIndic
 import { SoundService } from '../services/audio/SoundService';
 import { EmergencySosModal } from './EmergencySosModal';
 import { PassengerRideSummaryModal } from './PassengerRideSummaryModal';
+import { PassengerRatingModal } from './PassengerRatingModal';
 
 interface PassengerActiveRideViewProps {
   rideId?: string;
@@ -27,6 +28,7 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
 }) => {
   const [isSharing, setIsSharing] = useState(false);
   const [sosVisible, setSosVisible] = useState(false);
+  const [ratingVisible, setRatingVisible] = useState(false);
 
   const handleCall = () => {
     if (driverPhone) {
@@ -128,14 +130,21 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
       />
 
       <PassengerRideSummaryModal
-        visible={status === 'completed'}
+        visible={status === 'completed' && !ratingVisible}
         pickup="Pickup Location" // Mock for UI demo
         dropoff="Dropoff Location" // Mock for UI demo
         durationMins={15} // Mock for UI demo
         fare={500} // Mock for UI demo
         onRateDriver={() => {
-          // Handled upstream, dismisses or goes to rating
+          setRatingVisible(true);
         }}
+      />
+      <PassengerRatingModal
+        visible={ratingVisible}
+        driverName={driverName}
+        vehiclePlate={vehiclePlate}
+        onSubmit={(r, t, c) => setRatingVisible(false)}
+        onSkip={() => setRatingVisible(false)}
       />
     </View>
   );
