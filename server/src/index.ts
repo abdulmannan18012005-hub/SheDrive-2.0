@@ -14,6 +14,7 @@ import telemetryRoutes from './routes/telemetry.routes';
 import rideRoutes from './routes/ride.routes';
 import emergencyRoutes from './routes/emergency.routes';
 import ratingRoutes from './routes/rating.routes';
+import historyRoutes from './routes/history.routes';
 import { authenticateToken } from './middleware/auth.middleware';
 
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/telemetry', telemetryRoutes);
+app.use('/api/v1/rides', historyRoutes);
 app.use('/api/v1/rides', rideRoutes);
 app.use('/api/v1/rides', ratingRoutes);
 app.use('/api/v1/emergency', emergencyRoutes);

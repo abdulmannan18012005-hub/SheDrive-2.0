@@ -120,3 +120,10 @@
 - **How it was implemented**: Utilized DROP TABLE IF EXISTS ratings CASCADE to reset the legacy table inside an Express route shim to forcefully auto-migrate unique_ride_rater constraints, UUID compliance natively translated to VARCHAR(64) matching legacy fields, and the 	ags array column. Hooked rating views immediately proceeding the Phase 19 receipt modals on mobile ActiveRide screens.
 - **Verification**: 	est-phase20.ts simulated successful 4-star submittal checking row entries, rejected duplicate requests generating HTTP 400, validated automated driver numeric recalcs using AVG() SQL projections, and allowed counter-ratings successfully. Both server/ and mobile/ built rigorously with 0 TypeScript warnings.
 
+
+## Phase 21: Completed Rides History & Filtering
+- **Completed**: Yes
+- **What was built**: A fully paginated Ride History query engine (\GET /api/v1/rides/history\) with multi-vector filtering by status, timeslot (morning, afternoon, evening, night), date bounds, and string searches. An itemized ride receipt summary endpoint (\GET /api/v1/rides/:id/summary\) parsing timestamp milestones, fare decompositions, and mutual ratings. Mobile Stitch views \RideHistoryScreen\ and \RideDetailHistoryScreen\ capturing clean date banners, route line UI, and horizontal filter chips.
+- **How it was implemented**: Introduced \history.routes.ts\ injected onto \/api/v1/rides\ to route query parameter-driven parameterized SQL \LEFT JOIN\ aggregates dynamically mapping counterparty user info and driver vehicle metadata. The UI implements 300ms debounced queries and infinite scroll components (\onEndReached\). 
+- **Verification**: \	est-phase21.ts\ executed successful searches returning specific seed addresses (e.g., 'Gulberg'), strictly rejected unauthorized passenger token evaluations (HTTP 403), and cleanly returned 500 PKR receipt queries with properly nested 5-star rating attributes. 0 TypeScript errors verified via \	sc\.
+

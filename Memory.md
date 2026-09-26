@@ -33,3 +33,10 @@
 - Mapped 100% of the passenger and driver mutual rating constraints on \	est-phase20.ts\. Required patching \setupTestData()\ logic enforcing \users\ uniqueness on \cnic\, \phone\, and \email\ arrays, and strictly mapping missing NOT NULL \drivers\ table fields (like \ehicle_make\, \ehicle_model\, \ehicle_plate\, \ehicle_color\, and \last_location_update\).
 - Ready for Phase 21 (Completed Rides History & Filtering).
 
+
+## Phase 21 Updates
+- Encountered SQL parameterized mapping nuances with table aliasing inside complex \LEFT JOIN\ dynamic queries (e.g. \.vehicle_make\ failing without active \ehicles\ join, resolved cleanly by mapping to \drivers\ table alias \d2\). 
+- Verified Postgres \EXTRACT(HOUR FROM to_timestamp())\ execution parsing bigint strings into precise timezone-dependent constraints (\Asia/Karachi\) mapping dynamic 'morning' and 'night' categories natively inside the database.
+- Completed Rides History endpoints fully isolated into \history.routes.ts\ prior to \ide.routes.ts\ in Express to prevent \/:id\ slug collisions.
+- Ready for Phase 22 (Receipt Sharing & Bulk Export).
+
