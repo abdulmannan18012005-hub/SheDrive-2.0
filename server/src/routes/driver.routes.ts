@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../config/db';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 import { uploadImage } from '../services/cloudinary.service';
 
 const router = Router();
@@ -143,6 +143,99 @@ router.put('/vehicle', authenticateToken, async (req: Request, res: Response): P
         res.status(200).json({ message: 'Vehicle updated. Status changed to pending.' });
     } catch (err) {
         console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// GET /api/v1/driver/earnings/summary
+router.get('/earnings/summary', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    const driverId = (req as any).user.id;
+    const now = new Date();
+    
+    // Get start of today, week, month
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dayOfWeek = now.getDay();
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek).getTime();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    try {
+        const txRes = await pool.query(`
+            SELECT amount, created_at 
+            FROM payment_transactions 
+            WHERE payee_id = $1 AND status = 'success'
+        `, [driverId]);
+
+        let todayEarnings = 0;
+        let todayTrips = 0;
+        let weekEarnings = 0;
+        let monthEarnings = 0;
+
+        for (const tx of txRes.rows) {
+            const amount = parseFloat(tx.amount);
+            const ts = parseInt(tx.created_at, 10);
+            
+            if (ts >= startOfToday) {
+                todayEarnings += amount;
+                todayTrips++;
+            }
+            if (ts >= startOfWeek) {
+                weekEarnings += amount;
+            }
+            if (ts >= startOfMonth) {
+                monthEarnings += amount;
+            }
+        }
+
+        res.json({
+            today_earnings: todayEarnings,
+            today_trips: todayTrips,
+            week_earnings: weekEarnings,
+            month_earnings: monthEarnings
+        });
+    } catch (err) {
+        console.error('Earnings summary error:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// GET /api/v1/driver/monthly-account
+router.get('/monthly-account', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    const driverId = (req as any).user.id;
+    const now = new Date();
+    // format YYYY-MM
+    const billingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    try {
+        // Find existing or create placeholder response
+        let subRes = await pool.query(
+            "SELECT * FROM driver_subscriptions WHERE driver_id = $1 AND billing_month = $2",
+            [driverId, billingMonth]
+        );
+
+        if (subRes.rowCount === 0) {
+            // Lazy initialization of subscription
+            const subId = `sub-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+            const ts = Date.now();
+            await pool.query(
+                "INSERT INTO driver_subscriptions (id, driver_id, billing_month, base_fee, status, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+                [subId, driverId, billingMonth, 1000.00, 'unpaid', ts]
+            );
+            subRes = await pool.query(
+                "SELECT * FROM driver_subscriptions WHERE driver_id = $1 AND billing_month = $2",
+                [driverId, billingMonth]
+            );
+        }
+
+        const sub = subRes.rows[0];
+        res.json({
+            billing_month: sub.billing_month,
+            status: sub.status,
+            base_fee: parseFloat(sub.base_fee),
+            due_date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-05`, // 5th of next month roughly
+            paid_at: sub.paid_at
+        });
+    } catch (err) {
+        console.error('Monthly account error:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

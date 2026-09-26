@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Share, ActivityIndicator, Alert } from 'react-native';
 import { SoundService } from '../services/audio/SoundService';
 import { EmergencySosModal } from './EmergencySosModal';
+import { PassengerRideSummaryModal } from './PassengerRideSummaryModal';
 
 interface PassengerActiveRideViewProps {
   rideId?: string;
@@ -124,6 +125,17 @@ export const PassengerActiveRideView: React.FC<PassengerActiveRideViewProps> = (
         onClose={() => setSosVisible(false)} 
         rideId={rideId || ''} 
         authToken={authToken || ''} 
+      />
+
+      <PassengerRideSummaryModal
+        visible={status === 'completed'}
+        pickup="Pickup Location" // Mock for UI demo
+        dropoff="Dropoff Location" // Mock for UI demo
+        durationMins={15} // Mock for UI demo
+        fare={500} // Mock for UI demo
+        onRateDriver={() => {
+          // Handled upstream, dismisses or goes to rating
+        }}
       />
     </View>
   );

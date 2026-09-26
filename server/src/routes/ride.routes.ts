@@ -979,4 +979,94 @@ router.post('/:id/sos', authenticateToken, async (req: Request, res: Response): 
     }
 });
 
+// Auto-migrate payment tables
+pool.query(`
+    CREATE TABLE IF NOT EXISTS payment_transactions (
+        id VARCHAR(64) PRIMARY KEY,
+        ride_id VARCHAR(64) NOT NULL REFERENCES rides(ride_id),
+        payer_id VARCHAR(64) REFERENCES users(id),
+        payee_id VARCHAR(64) REFERENCES users(id),
+        amount NUMERIC(10, 2) NOT NULL,
+        payment_method VARCHAR(20) DEFAULT 'cash',
+        status VARCHAR(20) DEFAULT 'completed',
+        created_at BIGINT NOT NULL
+    );
+    ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS payer_id VARCHAR(64) REFERENCES users(id);
+    ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS payee_id VARCHAR(64) REFERENCES users(id);
+    ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT 'cash';
+
+    CREATE TABLE IF NOT EXISTS driver_subscriptions (
+        id VARCHAR(64) PRIMARY KEY,
+        driver_id VARCHAR(64) NOT NULL REFERENCES users(id),
+        billing_month VARCHAR(7) NOT NULL,
+        base_fee NUMERIC(10, 2) DEFAULT 1000.00,
+        status VARCHAR(20) DEFAULT 'unpaid',
+        paid_at BIGINT,
+        created_at BIGINT NOT NULL,
+        UNIQUE(driver_id, billing_month)
+    );
+`).catch(console.error);
+
+// POST /api/v1/rides/:id/complete
+router.post('/:id/complete', authenticateToken, requireRole('driver'), async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const driverId = (req as any).user.id;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Verify ride status
+        const rideRes = await client.query('SELECT * FROM rides WHERE ride_id = $1 AND driver_id = $2 FOR UPDATE', [id, driverId]);
+        if (rideRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            res.status(404).json({ error: 'Ride not found or not authorized' });
+            return;
+        }
+
+        const ride = rideRes.rows[0];
+        if (ride.status !== 'in_progress') {
+            await client.query('ROLLBACK');
+            res.status(400).json({ error: 'Ride must be in_progress to complete' });
+            return;
+        }
+
+        const now = Date.now();
+        const finalFare = ride.final_fare || ride.offered_fare || ride.estimated_fare;
+
+        // Update ride status
+        await client.query(`
+            UPDATE rides 
+            SET status = 'completed', updated_at = $1 
+            WHERE ride_id = $2
+        `, [now, id]);
+
+        // Insert payment transaction
+        const txId = `tx-${now}-${Math.floor(Math.random()*1000)}`;
+        await client.query(`
+            INSERT INTO payment_transactions (id, ride_id, user_id, provider, payer_id, payee_id, amount, payment_method, status, created_at, updated_at)
+            VALUES ($1, $2, $3, 'cash', $4, $5, $6, 'cash', 'success', $7, $7)
+        `, [txId, id, driverId, ride.passenger_id, driverId, finalFare, now]);
+
+        // Update driver total rides (handled loosely for now, or just via active queries later)
+        // Deactivate ride_shares token
+        await client.query("UPDATE ride_shares SET is_active = false WHERE ride_id = $1", [id]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            ride_id: id,
+            final_fare: finalFare,
+            payment_status: 'collected',
+            completed_at: now
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Ride completion error:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+        client.release();
+    }
+});
+
 export default router;

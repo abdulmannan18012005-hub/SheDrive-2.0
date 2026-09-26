@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { SoundService } from '../services/audio/SoundService';
 import { EmergencySosModal } from './EmergencySosModal';
+import { DriverCashCollectionModal } from './DriverCashCollectionModal';
 
 interface DriverActiveRideViewProps {
   rideId?: string;
@@ -86,6 +87,14 @@ export const DriverActiveRideView: React.FC<DriverActiveRideViewProps> = ({
         onClose={() => setSosVisible(false)} 
         rideId={rideId || ''} 
         authToken={authToken || ''} 
+      />
+
+      <DriverCashCollectionModal
+        visible={status === 'completed'}
+        fare={500} // Temporary mock fare, in a real app this would come from props
+        onConfirm={() => {
+          // Close modal or navigate away handled upstream usually, but for UI smoke test we render it when completed
+        }}
       />
     </View>
   );
