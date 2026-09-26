@@ -134,3 +134,10 @@
 - **How it was implemented**: Utilized Node's native response stream (\es.write\) escaping commas and double-quotes inline for CSV robustness to bypass memory bottlenecks. Wired Expo FileSystem \downloadAsync\ paired closely with \expo-sharing\ for mobile export capability.
 - **Verification**: Typechecks evaluated strictly to 0 errors. E2E verification assessed RFC 4180 column matching, payload calculations, verified 403 unauthorized interjections safely, and ensured proper Content-Type headers were attached.
 
+
+## Phase 23: Public Driver/Passenger Profile Pages & Trust Dossier
+- **Completed**: Yes
+- **What was built**: Built public-facing trust dossier endpoints (\/api/v1/profiles/driver/:driverId\ and \/api/v1/profiles/passenger/:passengerId\) generating safely sanitized projection payloads. Implemented SQL \unnest(tags)\ aggregations mapped with user rating averages and total historical trips. Designed and integrated front-end Stitch components (\DriverPublicProfileScreen.tsx\ and \PassengerPublicProfileScreen.tsx\) to cleanly visualize identity verifications, badges, and tag clouds without leaking raw user identifiers.
+- **How it was implemented**: Utilized Postgres \unnest\ grouping functions directly mapping array tokens into descending count structures. Designed clean boolean-to-string \adges\ conversions on the API layer isolating the mobile client from complex logical deduplications. Hooked the counterparty click-handler inside \RideDetailHistoryScreen.tsx\ natively.
+- **Verification**: Executed a HARD PRIVACY CHECK script in \	est-phase23.ts\ actively asserting \cnic\, \phone\, and \email\ fields are systematically stripped from JSON payloads, and successfully validated numeric grouping functions for test payloads. Typechecked the React Native component tree rigorously evaluating to 0 errors.
+

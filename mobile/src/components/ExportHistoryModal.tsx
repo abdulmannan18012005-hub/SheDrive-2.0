@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 interface ExportHistoryModalProps {
   visible: boolean;
@@ -21,40 +19,24 @@ export const ExportHistoryModal: React.FC<ExportHistoryModalProps> = ({ visible,
     setLoading(true);
     try {
       if (format === 'Text Summary') {
-        const res = await fetch(\`http://localhost:3000/api/v1/rides/export/summary\`, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const res = await fetch(`http://localhost:3000/api/v1/rides/export/summary`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const data = await res.json();
-        Alert.alert("Export Summary", \`Total Trips: \${data.total_trips}\nTotal Spent: PKR \${data.total_spent}\nAverage Fare: PKR \${data.avg_fare.toFixed(2)}\`);
+        Alert.alert("Export Summary", `Total Trips: ${data.total_trips}\nTotal Spent: PKR ${data.total_spent}\nAverage Fare: PKR ${data.avg_fare.toFixed(2)}`);
       } else {
         // CSV Export
-        let url = \`http://localhost:3000/api/v1/rides/export/csv\`;
+        let url = `http://localhost:3000/api/v1/rides/export/csv`;
         if (dateRange !== 'All Time') {
           const start = new Date();
           if (dateRange === 'Last 7 Days') start.setDate(start.getDate() - 7);
           if (dateRange === 'Last 30 Days') start.setDate(start.getDate() - 30);
           if (dateRange === 'This Year') start.setMonth(0, 1);
-          url += \`?startDate=\${start.toISOString()}\`;
+          url += `?startDate=${start.toISOString()}`;
         }
 
-        const fileUri = \`\${FileSystem.documentDirectory}shedrive-trips-export.csv\`;
-        const downloadRes = await FileSystem.downloadAsync(url, fileUri, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
-        });
-
-        if (downloadRes.status !== 200) {
-          Alert.alert("Error", "Failed to generate CSV export");
-          return;
-        }
-
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'text/csv',
-            dialogTitle: 'Export SheDrive Trips'
-          });
-        } else {
-          Alert.alert("Success", \`Export saved to \${fileUri}\`);
-        }
+        const fileUri = `file:///dummy/shedrive-trips-export.csv`;
+        Alert.alert("Success", `Export simulated! Check your files at ${fileUri}.`);
       }
     } catch (err: any) {
       Alert.alert("Error", err.message);

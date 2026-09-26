@@ -201,7 +201,8 @@ router.get('/:id/summary', authenticateToken, async (req: Request, res: Response
                 id: isPassenger ? ride.driver_id : ride.passenger_id,
                 name: isPassenger ? ride.driver_name : ride.passenger_name,
                 avatar_url: isPassenger ? ride.driver_avatar : ride.passenger_avatar,
-                rating: isPassenger ? (parseFloat(ride.driver_rating) || 5.0) : 5.0
+                rating: isPassenger ? (parseFloat(ride.driver_rating) || 5.0) : 5.0,
+                role: isPassenger ? 'driver' : 'passenger'
             },
             ratings: {
                 given: isPassenger ? passengerRating : driverRatingGiven,

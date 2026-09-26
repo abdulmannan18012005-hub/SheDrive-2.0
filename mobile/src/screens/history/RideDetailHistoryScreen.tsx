@@ -49,22 +49,22 @@ export const RideDetailHistoryScreen: React.FC<RideDetailHistoryScreenProps> = (
 
   const handleShare = async () => {
     try {
-      const res = await fetch(\`http://localhost:3000/api/v1/rides/\${rideId}/receipt\`, {
-        headers: { 'Authorization': \`Bearer \${authToken}\` }
+      const res = await fetch(`http://localhost:3000/api/v1/rides/${rideId}/receipt`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (!res.ok) {
         Alert.alert("Error", "Could not load receipt for sharing.");
         return;
       }
       const receipt = await res.json();
-      const message = \`🧾 *SheDrive Official Trip Receipt*
-Trip ID: \${receipt.receipt_number}
-Date: \${new Date(receipt.metadata.start_time).toLocaleDateString()}
-Route: \${receipt.route_details.pickup_address} -> \${receipt.route_details.dropoff_address}
-Vehicle: \${receipt.metadata.vehicle}
-Total Fare: PKR \${receipt.fare_breakdown.total_paid} (\${receipt.fare_breakdown.payment_mode})
+      const message = `🧾 *SheDrive Official Trip Receipt*
+Trip ID: ${receipt.receipt_number}
+Date: ${new Date(receipt.metadata.start_time).toLocaleDateString()}
+Route: ${receipt.route_details.pickup_address} -> ${receipt.route_details.dropoff_address}
+Vehicle: ${receipt.metadata.vehicle}
+Total Fare: PKR ${receipt.fare_breakdown.total_paid} (${receipt.fare_breakdown.payment_mode})
 
-Safe travels with SheDrive!\`;
+Safe travels with SheDrive!`;
 
       await Share.share({ message });
     } catch (error: any) {
@@ -141,7 +141,16 @@ Safe travels with SheDrive!\`;
             <Text style={styles.rating}>★ {counterparty.rating.toFixed(1)}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.profileLink}>
+        <TouchableOpacity 
+          style={styles.profileLink}
+          onPress={() => {
+            if (counterparty.role === 'driver') {
+              navigation.navigate('DriverPublicProfileScreen', { driverId: counterparty.id });
+            } else {
+              navigation.navigate('PassengerPublicProfileScreen', { passengerId: counterparty.id });
+            }
+          }}
+        >
           <Text style={styles.profileLinkText}>View Profile</Text>
         </TouchableOpacity>
       </View>
