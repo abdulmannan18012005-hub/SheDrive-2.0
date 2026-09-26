@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image, Share, Alert } from 'react-native';
 
 interface RideDetailHistoryScreenProps {
   route: any;
@@ -46,6 +46,31 @@ export const RideDetailHistoryScreen: React.FC<RideDetailHistoryScreenProps> = (
   }
 
   const { date, timestamps, route: rideRoute, distance_km, duration_min, fare_breakdown, counterparty, ratings } = details;
+
+  const handleShare = async () => {
+    try {
+      const res = await fetch(\`http://localhost:3000/api/v1/rides/\${rideId}/receipt\`, {
+        headers: { 'Authorization': \`Bearer \${authToken}\` }
+      });
+      if (!res.ok) {
+        Alert.alert("Error", "Could not load receipt for sharing.");
+        return;
+      }
+      const receipt = await res.json();
+      const message = \`🧾 *SheDrive Official Trip Receipt*
+Trip ID: \${receipt.receipt_number}
+Date: \${new Date(receipt.metadata.start_time).toLocaleDateString()}
+Route: \${receipt.route_details.pickup_address} -> \${receipt.route_details.dropoff_address}
+Vehicle: \${receipt.metadata.vehicle}
+Total Fare: PKR \${receipt.fare_breakdown.total_paid} (\${receipt.fare_breakdown.payment_mode})
+
+Safe travels with SheDrive!\`;
+
+      await Share.share({ message });
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -153,7 +178,7 @@ export const RideDetailHistoryScreen: React.FC<RideDetailHistoryScreenProps> = (
         </View>
       )}
 
-      <TouchableOpacity style={styles.shareBtn}>
+      <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
         <Text style={styles.shareBtnText}>Share Receipt</Text>
       </TouchableOpacity>
     </ScrollView>

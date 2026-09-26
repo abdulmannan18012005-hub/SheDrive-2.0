@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { RideHistoryCard } from './RideHistoryCard';
+import { ExportHistoryModal } from '../../components/ExportHistoryModal';
 
 interface RideHistoryScreenProps {
   navigation: any;
@@ -17,6 +18,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
   const [activeFilter, setActiveFilter] = useState('All');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [isExportVisible, setExportVisible] = useState(false);
 
   const fetchHistory = useCallback(async (pageNum = 1, isRefresh = false) => {
     try {
@@ -83,6 +85,12 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
 
   return (
     <View style={styles.container}>
+      <View style={styles.topHeader}>
+        <Text style={styles.screenTitle}>Ride History</Text>
+        <TouchableOpacity onPress={() => setExportVisible(true)} style={styles.exportIconBtn}>
+          <Text style={styles.exportIconText}>Export</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.header}>
         <TextInput
           style={styles.searchInput}
@@ -139,6 +147,12 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
           }
         />
       )}
+      
+      <ExportHistoryModal 
+        visible={isExportVisible} 
+        onClose={() => setExportVisible(false)} 
+        authToken={authToken} 
+      />
     </View>
   );
 };
@@ -147,6 +161,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    backgroundColor: '#fff',
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#0f172a',
+  },
+  exportIconBtn: {
+    padding: 8,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+  },
+  exportIconText: {
+    color: '#E91E63',
+    fontWeight: '600',
   },
   header: {
     backgroundColor: '#fff',

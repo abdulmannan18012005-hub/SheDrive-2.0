@@ -15,6 +15,8 @@ import rideRoutes from './routes/ride.routes';
 import emergencyRoutes from './routes/emergency.routes';
 import ratingRoutes from './routes/rating.routes';
 import historyRoutes from './routes/history.routes';
+import exportRoutes from './routes/export.routes';
+import receiptRoutes from './routes/receipt.routes';
 import { authenticateToken } from './middleware/auth.middleware';
 
 const app = express();
@@ -41,6 +43,8 @@ app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/telemetry', telemetryRoutes);
 app.use('/api/v1/rides', historyRoutes);
+app.use('/api/v1/rides', exportRoutes);
+app.use('/api/v1/rides', receiptRoutes);
 app.use('/api/v1/rides', rideRoutes);
 app.use('/api/v1/rides', ratingRoutes);
 app.use('/api/v1/emergency', emergencyRoutes);

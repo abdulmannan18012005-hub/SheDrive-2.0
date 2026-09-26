@@ -40,3 +40,10 @@
 - Completed Rides History endpoints fully isolated into \history.routes.ts\ prior to \ide.routes.ts\ in Express to prevent \/:id\ slug collisions.
 - Ready for Phase 22 (Receipt Sharing & Bulk Export).
 
+
+## Phase 22 Updates
+- Encountered bash template escaping artifacts in Powershell requiring regex scrubbing (\c.replace(/\\\$/g, '$')\) for accurate E2E \${}\ variable injections.
+- Express route matching sequences successfully segregated (\/export/csv\ and \/export/summary\ mounted strictly ahead of \/:id/receipt\ inside index injections).
+- Verified node \http.request\ header validation effectively resolving Content-Type evaluations asynchronously in Phase 22.
+- Ready for Phase 23 (Public Driver/Passenger Profile Pages).
+
