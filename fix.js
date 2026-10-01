@@ -1,5 +1,5 @@
 const fs = require('fs');
-['mobile/src/components/ExportHistoryModal.tsx', 'mobile/src/screens/history/RideDetailHistoryScreen.tsx', 'mobile/src/screens/profile/DriverPublicProfileScreen.tsx', 'mobile/src/screens/profile/PassengerPublicProfileScreen.tsx'].forEach(f => {
+['mobile/src/hooks/useRideChat.ts'].forEach(f => {
   if (fs.existsSync(f)) {
     let c = fs.readFileSync(f, 'utf8');
     c = c.replace(/\\\$/g, '$');

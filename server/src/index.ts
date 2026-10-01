@@ -18,6 +18,7 @@ import historyRoutes from './routes/history.routes';
 import exportRoutes from './routes/export.routes';
 import receiptRoutes from './routes/receipt.routes';
 import publicProfileRoutes from './routes/public-profile.routes';
+import chatRoutes from './routes/chat.routes';
 import { authenticateToken } from './middleware/auth.middleware';
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/v1/profiles', publicProfileRoutes);
 app.use('/api/v1/rides', historyRoutes);
 app.use('/api/v1/rides', exportRoutes);
 app.use('/api/v1/rides', receiptRoutes);
+app.use('/api/v1/rides', chatRoutes);
 app.use('/api/v1/rides', rideRoutes);
 app.use('/api/v1/rides', ratingRoutes);
 app.use('/api/v1/emergency', emergencyRoutes);

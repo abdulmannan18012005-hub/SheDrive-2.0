@@ -141,3 +141,11 @@
 - **How it was implemented**: Utilized Postgres \unnest\ grouping functions directly mapping array tokens into descending count structures. Designed clean boolean-to-string \adges\ conversions on the API layer isolating the mobile client from complex logical deduplications. Hooked the counterparty click-handler inside \RideDetailHistoryScreen.tsx\ natively.
 - **Verification**: Executed a HARD PRIVACY CHECK script in \	est-phase23.ts\ actively asserting \cnic\, \phone\, and \email\ fields are systematically stripped from JSON payloads, and successfully validated numeric grouping functions for test payloads. Typechecked the React Native component tree rigorously evaluating to 0 errors.
 
+
+## Phase 24: In-App Chat & Real-Time Engine
+- **Completed**: Yes
+- **What was built**: A resilient in-app coordination chat system for active rides. Backend components include strict status validation to block chat on completed rides, asynchronous chronological message synchronization, and automated reading-state toggle triggers. Mobile integrations include an optimized \useRideChat\ sync loop and an \InRideChatModal\ modal component equipped with auto-scrolling flat-lists and predefined one-tap messaging chips.
+- **How it was implemented**: Architected \chat.routes.ts\ executing timestamped Postgres insertions (\extract(epoch from now())\ / native defaults). The sync engine executes a robust polling interval evaluating updates monotonically every 3 seconds inside \useRideChat\.
+- **Verification**: Strict \
+px tsc --noEmit\ validated completely cleanly. The Node-driven \	est-phase24.ts\ sequentially evaluated the successful sending of payloads, the automated 1-tick unread-count, auto-read transitions on timeline fetch, enforced completed-ride HTTP 400 rejection, and strictly isolated third-party user tokens rendering HTTP 403 Forbidden.
+
