@@ -4,7 +4,12 @@
   "private": true,
   "scripts": {
     "lint": "echo \"Linting server...\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "dotenv": "^18.0.4",
